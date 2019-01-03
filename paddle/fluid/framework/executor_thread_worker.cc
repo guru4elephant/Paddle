@@ -75,6 +75,7 @@ void DensePullThread::reset_thread_version(uint64_t table_id) {
   std::lock_guard<std::mutex> lock(_mutex_for_version);
   _last_versions[table_id] = _current_version[table_id];
 }
+
 std::future<int32_t> DensePullThread::pull_dense(uint64_t table_id) {
   auto& regions = _regions[table_id];
   regions.clear();
@@ -268,12 +269,13 @@ void ExecutorThreadWorker::TrainFilesWithTimer() {
       ops_[i]->Run(*thread_scope_, place_);
       timeline.Pause();
       op_total_time[i] += timeline.ElapsedSec();
+
       total_time += timeline.ElapsedSec();
     }
     ++batch_cnt;
     thread_scope_->DropKids();
     if (thread_id_ == 0) {
-      if (batch_cnt > 0 && batch_cnt % 1000 == 0) {
+      if (batch_cnt > 0 && batch_cnt % 100 == 0) {
         for (size_t i = 0; i < ops_.size(); ++i) {
           fprintf(stderr, "op_name:[%zu][%s], op_mean_time:[%fs]\n", i,
                   op_name[i].c_str(), op_total_time[i] / batch_cnt);
@@ -338,6 +340,96 @@ void ExecutorThreadWorker::SetRootScope(Scope* g_scope) {
 }
 
 #ifdef PADDLE_WITH_PSLIB
+
+void AsyncExecutorThreadWorker::TrainFilesWithTimer() {
+  platform::SetNumThreads(1);
+  SetDevice();
+  int fetch_var_num = fetch_var_names_.size();
+  fetch_values_.clear();
+  fetch_values_.resize(fetch_var_num);
+  thread_reader_->Start();
+
+  std::vector<double> op_total_time;
+  std::vector<std::string> op_name;
+  for (auto& op : ops_) {
+    op_name.push_back(op->Type());
+  }
+  op_total_time.resize(ops_.size());
+  for (size_t i = 0; i < op_total_time.size(); ++i) {
+    op_total_time[i] = 0.0;
+  }
+
+  platform::Timer timeline;
+
+  double total_prepare_time = 0.0;
+  double total_update_time = 0.0;
+  double total_compute_time = 0.0;
+  double total_time = 0.0;
+  double read_time = 0.0;
+
+  int cur_batch;
+  int batch_cnt = 0;
+  timeline.Start();
+  while ((cur_batch = thread_reader_->Next()) > 0) {
+    timeline.Pause();
+    read_time += timeline.ElapsedSec();
+    total_time += timeline.ElapsedSec();
+    timeline.Start();
+    PrepareParams();
+    timeline.Pause();
+    total_prepare_time += timeline.ElapsedSec();
+    total_time += timeline.ElapsedSec();
+    for (size_t i = 0; i < ops_.size(); ++i) {
+      bool need_skip = false;
+      for (auto t = 0u; t < _param_config->skip_op.size(); ++t) {
+        if (ops_[i]->Type().find(_param_config->skip_op[t]) !=
+            std::string::npos) {
+          need_skip = true;
+          break;
+        }
+      }
+      if (!need_skip) {
+        timeline.Start();
+        ops_[i]->Run(*thread_scope_, place_);
+        timeline.Pause();
+        op_total_time[i] += timeline.ElapsedSec();
+        total_time += timeline.ElapsedSec();
+        total_compute_time += timeline.ElapsedSec();
+      }
+    }
+    timeline.Start();
+    UpdateParams();
+    timeline.Pause();
+    total_update_time += timeline.ElapsedSec();
+    batch_cnt++;
+    if (debug_ == false || thread_id_ != 0) {
+      continue;
+    }
+
+    if (thread_id_ == 0) {
+      if (batch_cnt > 0 && batch_cnt % 1000 == 0) {
+        for (size_t i = 0; i < ops_.size(); ++i) {
+          fprintf(stdout, "op_name:[%zu][%s], op_mean_time:[%fs]\n", i,
+                  op_name[i].c_str(), op_total_time[i] / batch_cnt);
+        }
+        fprintf(stdout, "mean read time: %fs\n", read_time / batch_cnt);
+        fprintf(stdout, "mean prepare time: %fs\n",
+                total_prepare_time / batch_cnt);
+        fprintf(stdout, "mean update time: %fs\n",
+                total_update_time / batch_cnt);
+        fprintf(stdout, "mean compute time: %fs\n",
+                total_compute_time / batch_cnt);
+        fprintf(stdout, "mean total time: %fs\n", total_time / batch_cnt);
+        for (int i = 0; i < fetch_var_num; ++i) {
+          print_fetch_var(thread_scope_, fetch_var_names_[i]);
+        }
+      }
+    }
+    thread_scope_->DropKids();
+    timeline.Start();
+  }
+}
+
 //  AsyncExecutor
 void AsyncExecutorThreadWorker::TrainFiles() {
   SetDevice();
@@ -477,8 +569,8 @@ void AsyncExecutorThreadWorker::PushDense(int table_id) {
 }
 
 void AsyncExecutorThreadWorker::PullSparse(int table_id) {
-  auto& features = _features[table_id];
-  auto& feature_value = _feature_value[table_id];
+  auto& features = _features[table_id];            // key
+  auto& feature_value = _feature_value[table_id];  // value
   auto fea_dim = _param_config->fea_dim;
   // slot id starts from 1
   features.clear();
@@ -507,6 +599,12 @@ void AsyncExecutorThreadWorker::PullSparse(int table_id) {
     pull_feature_value.push_back(feature_value[i].data());
   }
 
+  // pull_feature_value: vector<vector<float>>
+  // features: vector<uint64_t>
+  // float **
+  // table_id
+  // uint64_t *
+  // int64_t
   auto status = _pslib_ptr->_worker_ptr->pull_sparse(
       pull_feature_value.data(), table_id, features.data(), features.size());
   _pull_sparse_status.push_back(std::move(status));
@@ -544,6 +642,7 @@ void AsyncExecutorThreadWorker::FillSparse(int table_id) {
     memset(ptr, 0, sizeof(float) * len * slot_dim);
     auto& tensor_lod = tensor->lod()[0];
 
+    // slow, can speedup
     LoD data_lod{tensor_lod};
     tensor_emb->set_lod(data_lod);
 
@@ -616,9 +715,10 @@ void AsyncExecutorThreadWorker::PushSparse(int table_id) {
         continue;
       }
       memcpy(push_g[fea_idx].data() + offset, g, sizeof(float) * slot_dim);
-      push_g[fea_idx][0] = 1.0f;
+      push_g[fea_idx][0] = 1.0f;  // show
       CHECK(fea_idx < fea_info.size()) << "fea_idx:" << fea_idx
                                        << " size:" << fea_info.size();
+      // click
       push_g[fea_idx][1] = static_cast<float>(fea_info[fea_idx].label);
       g += slot_dim;
       fea_idx++;

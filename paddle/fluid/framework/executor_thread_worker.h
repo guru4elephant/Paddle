@@ -201,6 +201,7 @@ class AsyncExecutorThreadWorker : public ExecutorThreadWorker {
   void SetPSlibPtr(std::shared_ptr<paddle::distributed::PSlib> pslib_ptr);
   void SetPullDenseThread(std::shared_ptr<DensePullThread> dpt);
   void SetParamConfig(AsyncWorkerParamConfig* param_config);
+  void TrainFilesWithTimer();
   void TrainFiles();
   void TrainOneNetwork();
   void PrepareParams();

@@ -92,6 +92,8 @@ class AsyncExecutor {
 #endif
 
  public:
+  std::shared_ptr<FleetWrapper> _fleet_ptr;
+
 #ifdef PADDLE_WITH_PSLIB
   std::shared_ptr<paddle::distributed::PSlib> _pslib_ptr;
   std::shared_ptr<DensePullThread> _pull_dense_thread;
