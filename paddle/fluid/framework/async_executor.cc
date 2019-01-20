@@ -51,7 +51,6 @@ void AsyncExecutor::CreateThreads(
   worker->SetFetchVarNames(fetch_var_names);
   worker->BindingDataFeedMemory();
 #ifdef PADDLE_WITH_PSLIB
-  worker->SetPSlibPtr(_pslib_ptr);
   worker->SetPullDenseThread(_pull_dense_thread);
   worker->SetParamConfig(&_param_config);
 #endif
@@ -70,34 +69,41 @@ void PrepareReaders(std::vector<std::shared_ptr<DataFeed>>& readers,  // NOLINT
 
 #ifdef PADDLE_WITH_PSLIB
 void AsyncExecutor::InitServer(const std::string& dist_desc, int index) {
+  _fleet_ptr = FleetWrapper::GetInstance();
+  _fleet_ptr->InitServer(dist_desc, index);
+  /*
   _pslib_ptr = std::shared_ptr<paddle::distributed::PSlib>(
       new paddle::distributed::PSlib());
   _pslib_ptr->init_server(dist_desc, index);
   InitParamConfig();
+  */
 }
 
 void AsyncExecutor::InitWorker(const std::string& dist_desc,
                                const std::vector<uint64_t>& host_sign_list,
                                int node_num, int index) {
+  _fleet_ptr = FleetWrapper::GetInstance();
+  /*
   _pslib_ptr = std::shared_ptr<paddle::distributed::PSlib>(
       new paddle::distributed::PSlib());
   _pslib_ptr->init_worker(
       dist_desc, const_cast<uint64_t*>(host_sign_list.data()), node_num, index);
-
+  */
+  _fleet_ptr->InitWorker(dist_desc, host_sign_list, node_num, index);
   InitParamConfig();
 }
 
-uint64_t AsyncExecutor::StartServer() { return _pslib_ptr->run_server(); }
+uint64_t AsyncExecutor::StartServer() { return _fleet_ptr->RunServer(); }
 
-void AsyncExecutor::StopServer() { _pslib_ptr->stop_server(); }
+void AsyncExecutor::StopServer() { _fleet_ptr->StopServer(); }
 
 void AsyncExecutor::GatherServers(const std::vector<uint64_t>& host_sign_list,
                                   int node_num) {
-  _pslib_ptr->gather_servers(const_cast<uint64_t*>(host_sign_list.data()),
-                             node_num);
+  _fleet_ptr->GatherServers(host_sign_list, node_num);
 }
 
 void AsyncExecutor::InitParamConfig() {
+  /*
   for (int i = 0; i < _pslib_ptr->get_param()
                           ->server_param()
                           .downpour_server_param()
@@ -168,9 +174,11 @@ void AsyncExecutor::InitParamConfig() {
     _param_config.dense_table_id.push_back(table.table_id());
     _param_config.dense_table_size.push_back(table.fea_dim());
   }
+  */
 }
 
 void AsyncExecutor::InitModel() {
+  /*
   for (auto table_id : _param_config.dense_table_id) {
     std::vector<paddle::ps::Region> regions;
     for (auto& t : _param_config.dense_variable_name[table_id]) {
@@ -203,9 +211,11 @@ void AsyncExecutor::InitModel() {
       exit(-1);
     }
   }
+  */
 }
 
 void AsyncExecutor::SaveModel(const std::string& path) {
+  /*
   auto ret = _pslib_ptr->_worker_ptr->flush();
   ret.wait();
   ret = _pslib_ptr->_worker_ptr->save(path, 0);
@@ -215,9 +225,11 @@ void AsyncExecutor::SaveModel(const std::string& path) {
     LOG(FATAL) << "save model failed";
     exit(-1);
   }
+  */
 }
 
 void AsyncExecutor::PrepareDenseThread(const std::string& mode) {
+  /*
   if (mode == "mpi") {
     DensePullThreadParam param;
     param.ps_client = _pslib_ptr->_worker_ptr;
@@ -230,6 +242,7 @@ void AsyncExecutor::PrepareDenseThread(const std::string& mode) {
         std::shared_ptr<DensePullThread>(new DensePullThread(param));
     _pull_dense_thread->start();
   }
+  */
 }
 #endif
 
