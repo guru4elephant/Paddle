@@ -24,6 +24,7 @@ from paddle.fluid.proto import data_feed_pb2
 from google.protobuf import text_format
 from . import io
 from .data_feed_desc import DataFeedDesc
+from .trainer_desc import TrainerDesc, MultiTrainer, DistMultiTrainer
 from .distributed import ps_instance
 from .contrib.utils import hdfs_utils as hdfs
 
@@ -89,6 +90,35 @@ class AsyncExecutor(object):
         self.executor = core.AsyncExecutor(scope, p)
         self.instance = None
 
+    def run(self, program, data_feed, filelist, thread_num, fetch, debug=False):
+        if program is None:
+            program = default_main_program()
+        program_desc = program.desc
+
+        if data_feed is None:
+            raise ValueError('ValueError: data_feed should be provided')
+
+        if filelist is None:
+            raise ValueError('ValueError: filelist should be provided')
+
+        if isinstance(filelist, str):
+            filelist = [filelist]
+
+        if not isinstance(thread_num, int):
+            raise TypeError('TypeError: thread_num should be a positive number')
+
+        is_local = self.instance == None
+        trainer = None
+        if is_local:
+            trainer = MultiTrainer(worker="Hogwild")
+        else:
+            trainer = DistMultiTrainer(worker="Downpour")
+        trainer.set_thread(thread_num)
+        trainer.set_filelist(filelist)
+        trainer.set_data_feed(data_feed)
+        self.executor.run_from_files(program_desc, trainer._desc(), debug)
+
+    '''
     def run(self,
             program,
             data_feed,
@@ -160,6 +190,7 @@ class AsyncExecutor(object):
         self.executor.run_from_files(program_desc,
                                      data_feed.desc(), filelist, thread_num,
                                      fetch_var_names, mode, debug)
+    '''
 
     def download_data(self,
                       afs_path,
@@ -200,7 +231,6 @@ class AsyncExecutor(object):
             local_path,
             self.instance.get_worker_index(),
             self.instance.get_node_cnt() / 2,
-            file_cnt,
             multi_processes=process_num)
         self.instance.barrier_worker()  #wait for download_data
 

@@ -38,66 +38,30 @@ namespace framework {
 AsyncExecutor::AsyncExecutor(Scope* scope, const platform::Place& place)
     : root_scope_(scope), place_(place) {}
 
-void AsyncExecutor::CreateThreads(
-    ExecutorThreadWorker* worker, const ProgramDesc& main_program,
-    const std::shared_ptr<DataFeed>& reader,
-    const std::vector<std::string>& fetch_var_names, Scope* root_scope,
-    const int thread_index, const bool debug) {
-  worker->SetThreadId(thread_index);
-  worker->SetDebug(debug);
-  worker->SetRootScope(root_scope);
-  worker->CreateThreadResource(main_program, place_);
-  worker->SetDataFeed(reader);
-  worker->SetFetchVarNames(fetch_var_names);
-  worker->BindingDataFeedMemory();
-#ifdef PADDLE_WITH_PSLIB
-  worker->SetPSlibPtr(_pslib_ptr);
-  worker->SetPullDenseThread(_pull_dense_thread);
-  worker->SetParamConfig(&_param_config);
-#endif
-}
-
-void PrepareReaders(std::vector<std::shared_ptr<DataFeed>>& readers,  // NOLINT
-                    const int thread_num, const DataFeedDesc& data_feed_desc,
-                    const std::vector<std::string>& filelist) {
-  readers.resize(thread_num);
-  for (size_t i = 0; i < readers.size(); ++i) {
-    readers[i] = DataFeedFactory::CreateDataFeed(data_feed_desc.name());
-    readers[i]->Init(data_feed_desc);  // set batch_size and queue_size here
-  }
-  readers[0]->SetFileList(filelist);
-}
-
-#ifdef PADDLE_WITH_PSLIB
 void AsyncExecutor::InitServer(const std::string& dist_desc, int index) {
-  _pslib_ptr = std::shared_ptr<paddle::distributed::PSlib>(
-      new paddle::distributed::PSlib());
-  _pslib_ptr->init_server(dist_desc, index);
-  InitParamConfig();
+  _fleet_ptr = FleetWrapper::GetInstance();
+  _fleet_ptr->InitServer(dist_desc, index);
 }
 
 void AsyncExecutor::InitWorker(const std::string& dist_desc,
                                const std::vector<uint64_t>& host_sign_list,
                                int node_num, int index) {
-  _pslib_ptr = std::shared_ptr<paddle::distributed::PSlib>(
-      new paddle::distributed::PSlib());
-  _pslib_ptr->init_worker(
-      dist_desc, const_cast<uint64_t*>(host_sign_list.data()), node_num, index);
-
+  _fleet_ptr = FleetWrapper::GetInstance();
+  _fleet_ptr->InitWorker(dist_desc, host_sign_list, node_num, index);
   InitParamConfig();
 }
 
-uint64_t AsyncExecutor::StartServer() { return _pslib_ptr->run_server(); }
+uint64_t AsyncExecutor::StartServer() { return _fleet_ptr->RunServer(); }
 
-void AsyncExecutor::StopServer() { _pslib_ptr->stop_server(); }
+void AsyncExecutor::StopServer() { _fleet_ptr->StopServer(); }
 
 void AsyncExecutor::GatherServers(const std::vector<uint64_t>& host_sign_list,
                                   int node_num) {
-  _pslib_ptr->gather_servers(const_cast<uint64_t*>(host_sign_list.data()),
-                             node_num);
+  _fleet_ptr->GatherServers(host_sign_list, node_num);
 }
 
 void AsyncExecutor::InitParamConfig() {
+  /*
   for (int i = 0; i < _pslib_ptr->get_param()
                           ->server_param()
                           .downpour_server_param()
@@ -168,9 +132,11 @@ void AsyncExecutor::InitParamConfig() {
     _param_config.dense_table_id.push_back(table.table_id());
     _param_config.dense_table_size.push_back(table.fea_dim());
   }
+  */
 }
 
 void AsyncExecutor::InitModel() {
+  /*
   for (auto table_id : _param_config.dense_table_id) {
     std::vector<paddle::ps::Region> regions;
     for (auto& t : _param_config.dense_variable_name[table_id]) {
@@ -203,9 +169,11 @@ void AsyncExecutor::InitModel() {
       exit(-1);
     }
   }
+  */
 }
 
 void AsyncExecutor::SaveModel(const std::string& path) {
+  /*
   auto ret = _pslib_ptr->_worker_ptr->flush();
   ret.wait();
   ret = _pslib_ptr->_worker_ptr->save(path, 0);
@@ -215,9 +183,11 @@ void AsyncExecutor::SaveModel(const std::string& path) {
     LOG(FATAL) << "save model failed";
     exit(-1);
   }
+  */
 }
 
 void AsyncExecutor::PrepareDenseThread(const std::string& mode) {
+  /*
   if (mode == "mpi") {
     DensePullThreadParam param;
     param.ps_client = _pslib_ptr->_worker_ptr;
@@ -230,101 +200,40 @@ void AsyncExecutor::PrepareDenseThread(const std::string& mode) {
         std::shared_ptr<DensePullThread>(new DensePullThread(param));
     _pull_dense_thread->start();
   }
+  */
 }
-#endif
 
 void AsyncExecutor::RunFromFile(const ProgramDesc& main_program,
-                                const std::string& data_feed_desc_str,
-                                const std::vector<std::string>& filelist,
-                                const int thread_num,
-                                const std::vector<std::string>& fetch_var_names,
-                                const std::string& mode, const bool debug) {
-  std::vector<std::thread> threads;
+                                const std::string& trainer_desc_str,
+                                const bool debug) {
+  TrainerDesc trainer_desc;
+  google::protobuf::TextFormat::ParseFromString(trainer_desc_str,
+                                                &trainer_desc);
+  LOG(WARNING) << "parse protobuf done.";
+  LOG(WARNING) << "trainer class " << trainer_desc.class_name();
+  std::shared_ptr<TrainerBase> trainer;
+  trainer = TrainerFactory::CreateTrainer(trainer_desc.class_name());
+  LOG(WARNING) << "create trainer done.";
+  // initialize trainer
+  trainer->Initialize(trainer_desc);
+  LOG(WARNING) << "initialization done.";
+  trainer->SetScope(root_scope_);
+  trainer->SetDebug(debug);
+  LOG(WARNING) << "set scope done.";
+  // prepare training environment and helper environment
+  trainer->InitTrainerEnv(main_program, place_);
+  LOG(WARNING) << "init train env done.";
+  trainer->InitOtherEnv(main_program);
+  LOG(WARNING) << "init other env done.";
 
-  auto& block = main_program.Block(0);
-  for (auto var_name : fetch_var_names) {
-    auto var_desc = block.FindVar(var_name);
-    auto shapes = var_desc->GetShape();
-    PADDLE_ENFORCE(shapes[shapes.size() - 1] == 1,
-                   "var %s: Fetched var has wrong shape, "
-                   "only variables with the last dimension size 1 supported",
-                   var_name);
-  }
-
-  DataFeedDesc data_feed_desc;
-  google::protobuf::TextFormat::ParseFromString(data_feed_desc_str,
-                                                &data_feed_desc);
-
-  actual_thread_num = thread_num;
-  int file_cnt = filelist.size();
-  PADDLE_ENFORCE(file_cnt > 0, "File list cannot be empty");
-
-  if (actual_thread_num > file_cnt) {
-    VLOG(1) << "Thread num = " << thread_num << ", file num = " << file_cnt
-            << ". Changing thread_num = " << file_cnt;
-    actual_thread_num = file_cnt;
-  }
-
-  /*
-    readerDesc: protobuf description for reader initlization
-    argument: class_name, batch_size, use_slot, queue_size, buffer_size,
-    padding_index
-
-    reader:
-    1) each thread has a reader, reader will read input data and
-    put it into input queue
-    2) each reader has a Next() iterface, that can fetch an instance
-    from the input queue
-   */
-  // todo: should be factory method for creating datafeed
-  std::vector<std::shared_ptr<DataFeed>> readers;
-  PrepareReaders(readers, actual_thread_num, data_feed_desc, filelist);
-#ifdef PADDLE_WITH_PSLIB
-  PrepareDenseThread(mode);
-#endif
-  std::vector<std::shared_ptr<ExecutorThreadWorker>> workers;
-  workers.resize(actual_thread_num);
-  for (auto& worker : workers) {
-#ifdef PADDLE_WITH_PSLIB
-    if (mode == "mpi") {
-      worker.reset(new AsyncExecutorThreadWorker);
-    } else {
-      worker.reset(new ExecutorThreadWorker);
-    }
-#else
-    worker.reset(new ExecutorThreadWorker);
-#endif
-  }
-
-  // prepare thread resource here
-  for (int thidx = 0; thidx < actual_thread_num; ++thidx) {
-    CreateThreads(workers[thidx].get(), main_program, readers[thidx],
-                  fetch_var_names, root_scope_, thidx, debug);
-  }
-
-  // start executing ops in multiple threads
-  for (int thidx = 0; thidx < actual_thread_num; ++thidx) {
-    if (debug) {
-      threads.push_back(std::thread(&ExecutorThreadWorker::TrainFilesWithTimer,
-                                    workers[thidx].get()));
-    } else {
-      threads.push_back(
-          std::thread(&ExecutorThreadWorker::TrainFiles, workers[thidx].get()));
-    }
-  }
-
-  for (auto& th : threads) {
-    th.join();
-  }
-#ifdef PADDLE_WITH_PSLIB
-  if (mode == "mpi") {
-    _pull_dense_thread->stop();
-  }
-#endif
+  // training and finalize training
+  trainer->Run();
+  LOG(WARNING) << "run.";
+  trainer->Finalize();
+  LOG(WARNING) << "finalize.";
   root_scope_->DropKids();
-
   return;
 }
 
-}  // einit_modelnd namespace framework
+}  // end namespace framework
 }  // end namespace paddle

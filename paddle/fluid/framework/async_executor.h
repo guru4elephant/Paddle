@@ -27,8 +27,11 @@ limitations under the License. */
 #include "paddle/fluid/framework/data_feed.pb.h"
 #include "paddle/fluid/framework/executor.h"
 #include "paddle/fluid/framework/executor_thread_worker.h"
+#include "paddle/fluid/framework/fleet/fleet_wrapper.h"
 #include "paddle/fluid/framework/program_desc.h"
 #include "paddle/fluid/framework/scope.h"
+#include "paddle/fluid/framework/trainer.h"
+#include "paddle/fluid/framework/trainer_factory.h"
 
 namespace paddle {
 namespace framework {
@@ -62,12 +65,7 @@ class AsyncExecutor {
   AsyncExecutor(Scope* scope, const platform::Place& place);
   virtual ~AsyncExecutor() {}
   void RunFromFile(const ProgramDesc& main_program,
-                   const std::string& data_feed_desc_str,
-                   const std::vector<std::string>& filelist,
-                   const int thread_num,
-                   const std::vector<std::string>& fetch_names,
-                   const std::string& mode, const bool debug = false);
-#ifdef PADDLE_WITH_PSLIB
+                   const std::string& trainer_desc_str, const bool debug);
   void InitServer(const std::string& dist_desc, int index);
   void InitWorker(const std::string& dist_desc,
                   const std::vector<uint64_t>& host_sign_list, int node_num,
@@ -78,7 +76,6 @@ class AsyncExecutor {
   void InitModel();
   void SaveModel(const std::string& path);
   void InitParamConfig();
-#endif
 
  private:
   void CreateThreads(ExecutorThreadWorker* worker,
@@ -87,16 +84,14 @@ class AsyncExecutor {
                      const std::vector<std::string>& fetch_var_names,
                      Scope* root_scope, const int thread_index,
                      const bool debug);
-#ifdef PADDLE_WITH_PSLIB
+
+  // should be moved into trainer
   void PrepareDenseThread(const std::string& mode);
-#endif
 
  public:
-#ifdef PADDLE_WITH_PSLIB
-  std::shared_ptr<paddle::distributed::PSlib> _pslib_ptr;
-  std::shared_ptr<DensePullThread> _pull_dense_thread;
-  AsyncWorkerParamConfig _param_config;
-#endif
+  std::shared_ptr<paddle::framework::FleetWrapper> _fleet_ptr;
+  // std::shared_ptr<DensePullThread> _pull_dense_thread;
+  // AsyncWorkerParamConfig _param_config;
   Scope* root_scope_;
   platform::Place place_;
 

@@ -23,9 +23,12 @@ endfunction()
 
 add_subdirectory(ir)
 add_subdirectory(details)
+add_subdirectory(fleet)
 #ddim lib
 proto_library(framework_proto SRCS framework.proto)
 proto_library(async_executor_proto SRCS data_feed.proto)
+proto_library(trainer_desc_proto SRCS trainer_desc.proto)
+proto_library(device_worker_proto SRCS device_worker.proto)
 
 cc_library(ddim SRCS ddim.cc DEPS eigen3 boost enforce)
 cc_test(ddim_test SRCS ddim_test.cc DEPS ddim)
@@ -138,7 +141,7 @@ endif(WITH_NGRAPH)
 cc_library(op_registry SRCS op_registry.cc DEPS op_proto_maker op_info operator glog proto_desc)
 nv_test(op_registry_test SRCS op_registry_test.cc DEPS op_registry)
 
-py_proto_compile(framework_py_proto SRCS framework.proto data_feed.proto)
+py_proto_compile(framework_py_proto SRCS framework.proto data_feed.proto trainer_desc.proto device_worker.proto)
 #Generate an empty \
     #__init__.py to make framework_py_proto as a valid python module.
 add_custom_target(framework_py_proto_init ALL COMMAND ${CMAKE_COMMAND} -E touch __init__.py)
@@ -189,9 +192,21 @@ cc_library(parallel_executor SRCS parallel_executor.cc DEPS
         fast_threaded_ssa_graph_executor variable_helper)
 
 if(WITH_PSLIB)
-    cc_library(async_executor SRCS async_executor.cc data_feed.cc data_feed_factory.cc executor_thread_worker.cc DEPS op_registry device_context scope framework_proto glog lod_rank_table feed_fetch_method graph_to_program_pass async_executor_proto variable_helper pslib_brpc pslib timer)
+    cc_library(async_executor SRCS async_executor.cc data_feed.cc data_feed_factory.cc
+                              executor_thread_worker.cc multi_trainer.cc trainer_factory.cc
+			      trainer.cc device_worker.cc hogwild_worker.cc device_worker_factory.cc
+			      DEPS op_registry device_context scope framework_proto
+			      trainer_desc_proto device_worker_proto glog lod_rank_table
+			      feed_fetch_method graph_to_program_pass async_executor_proto
+			      variable_helper fleet_wrapper pslib_brpc pslib timer)
 else()
-    cc_library(async_executor SRCS async_executor.cc data_feed.cc data_feed_factory.cc executor_thread_worker.cc DEPS op_registry device_context scope framework_proto glog lod_rank_table feed_fetch_method graph_to_program_pass async_executor_proto variable_helper timer)
+    cc_library(async_executor SRCS async_executor.cc data_feed.cc data_feed_factory.cc
+                              executor_thread_worker.cc multi_trainer.cc trainer_factory.cc
+			      trainer.cc device_worker.cc hogwild_worker.cc device_worker_factory.cc
+			      DEPS op_registry device_context scope framework_proto
+			      trainer_desc_proto device_worker_proto glog lod_rank_table
+			      feed_fetch_method fleet_wrapper graph_to_program_pass async_executor_proto
+			      variable_helper timer)
 endif(WITH_PSLIB)
 
 
