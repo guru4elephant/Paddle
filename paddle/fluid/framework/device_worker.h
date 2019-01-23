@@ -36,6 +36,44 @@ limitations under the License. */
 namespace paddle {
 namespace framework {
 
+class PullDenseWorker {
+ public:
+  PullDenseWorker() {}
+  virtual ~PullDenseWorker() {}
+  virtual void Initialize(const PullDenseWorkerParameter& param);
+  void Start();
+  void Stop();
+  void IncreaseThreadVersion(int thread_id, uint64_t table_id);
+  void ResetThreadVersion(uint64_t table_id);
+  void WaitAll();
+ private:
+  void Run();
+  bool CheckUpdateParam(uint64_t table_id);
+  
+ private:
+  std::shared_ptr<paddle::framework::FleetWrapper> fleet_ptr_;
+  PullDenseWorkerParameter _param;
+  Scope* _root_scope;
+  bool _running;
+
+  std::map<uint64_t, uint64_t> _last_versions;
+  std::map<uint64_t, uint64_t> _current_version;
+  std::mutex _mutex_for_version;
+  std::map<uint64_t, std::vector<uint64_t>> _training_versions;
+  std::map<uint64_t, std::vector<std::string>> _dense_variable_name;
+  
+  std::thread _t;
+
+  std::vector<::std::future<int32_t>> _pull_dense_status;
+  uint32_t _pull_dense_fail_times = 0;
+  std::vector<float> _base_norm_param;
+  std::vector<float> _mean;
+  std::vector<float> _scale;
+  float _squared_sum_epsilon = 1e-4;
+  std::mutex _mutex_for_mean_scale;
+  float _total_batch_num = 0;
+};
+
 // should incorporate different type of device
 class DeviceWorker {
  public:
@@ -95,7 +133,7 @@ class HogwildWorker : public CPUWorkerBase {
   platform::Place place_;
 };
 
-/*
+
 class DownpourWorker : public HogwildWorker {
  public:
   DownpourWorker() {}
@@ -109,21 +147,14 @@ class DownpourWorker : public HogwildWorker {
   std::shared_ptr<paddle::framework::FleetWrapper> fleet_ptr_;
   void PushSparse(int table_id);
   void PushDense(int table_id);
-  void PullSparse(int table_id);
-  void FillSparse(int table_id);
-  void TrainOneNetwork();
-  void PrepareParams();
-  void UpdateParams();
-  void collect_feasign_info(int table_id);
+  void PullSparse();
+  void FillSparseValue(int table_id);
+  void PushGradients();
+  void CollectLabelInfo(int table_id);
 
  private:
-  struct FeasignInfo {
-    uint32_t slot;
-    uint32_t ins;
-    int64_t label;
-  };
-
-  struct AsyncWorkerParamConfig {
+  DownpourWorkerParameter _param;
+  struct ParamConfig {
     int slot_dim;
     int fea_dim;
     int32_t tmp_push_dense_wait_times;
@@ -137,18 +168,26 @@ class DownpourWorker : public HogwildWorker {
     std::map<uint64_t, std::vector<std::string>> gradient_var;
     std::map<std::string, uint64_t> slot_alias_to_table;
   };
+
+  std::map<uint64_t, std::vector<std::string>> _table_key;
+  std::map<uint64_t, std::vector<std::string>> _table_value;
+  std::map<uint64_t, std::vector<std::string>> _table_value_gradient;
+
+  // feasign
   std::map<uint64_t, std::vector<uint64_t>> _features;
-  std::map<uint64_t, std::vector<FeasignInfo>> _fea_info;
-  std::map<uint64_t, std::vector<std::vector<float>>> _feature_value;
-  std::map<uint64_t, std::vector<std::vector<float>>> _feature_push_value;
-  std::shared_ptr<paddle::distributed::PSlib> _pslib_ptr;
+  // feasign stats
+  std::map<uint64_t, std::vector<float>> _feature_labels;
+  // feasign embedding
+  std::map<uint64_t, std::vector<std::vector<float>>> _feature_values;
+  // feasign embedding gradient
+  std::map<uint64_t, std::vector<std::vector<float>>> _feature_push_values;
+  // fleet handler
+  std::shared_ptr<paddle::framework::FleetWrapper> fleet_ptr_;
+
   std::shared_ptr<DensePullThread> _pull_dense_thread;
-  std::vector<::std::future<int32_t>> _pull_sparse_status;
-  std::vector<::std::future<int32_t>> _pull_dense_status;
   std::vector<::std::future<int32_t>> _push_sparse_status;
   std::vector<::std::future<int32_t>> _push_dense_status;
 };
-*/
 
 }  // namespace framework
 }  // namespace paddle

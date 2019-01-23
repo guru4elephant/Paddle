@@ -18,5 +18,23 @@ limitations under the License. */
 namespace paddle {
 namespace framework {
 void InitializeVariable(Variable *var, proto::VarType::Type var_type);
-}
-}
+template <class T>
+struct LoDBlob {
+    void init(Scope* scope, std::string& name) {
+        var_ = scope->FindVar(name);
+        tensor_ = var->GetMutable<LoDTensor>();
+        ptr_ = tensor->data<T>();
+    }
+    const Lod& lod() {
+        return tensor_->lod();
+    }
+    const int numel() {
+        return tensor_->numel();
+    }
+    Variable* var_;
+    LoDTensor* tensor_;
+    T* ptr_;
+};
+
+}  // end namespace framework
+}  // end namespace paddle

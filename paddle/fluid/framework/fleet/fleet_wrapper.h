@@ -29,6 +29,38 @@ class FleetWrapper {
   FleetWrapper() {}
   virtual ~FleetWrapper() {}
 
+  void PushDenseVarsAsync(
+          vector<std::string>& var_names,
+          const Scope& scope, uint64_t table_id,
+          std::vector<::std::future<int32_t>>* push_sparse_status);
+
+  void PullSparseVarsSync(
+          vector<std::string>& var_names,
+          const Scope& scope, uint64_t table_id,
+          std::vector<uint64_t>* fea_keys,
+          std::vector<std::vector<float>>* fea_values);
+
+  void PushSparseVarsWithLabelAsync(
+          const vector<uint64_t>& fea_keys,
+          const vector<int64_t>& fea_labels,
+          const Scope& scope,
+          vector<std::string>& value_var_names,
+          std::vector<std::vector<float>>* push_values,
+          uint64_t table_id,
+          std::vector<::std::future<int32_t>>* push_sparse_status);
+
+  void PushSparseVarsAsync(
+          const vector<uint64_t>& fea_keys,
+          const Scope& scope,
+          vector<std::string>& value_var_names,
+          std::vector<std::vector<float>>* push_values,
+          uint64_t table_id,
+          std::vector<::std::future<int32_t>>* push_sparse_status);
+
+  std::future<uint32_t> WorkerPullSparse();
+  std::future<uint32_t> WorkerPushSparse();
+  std::future<uint32_t> WorkerPullDense();
+  std::future<uint32_t> WorkerPushDense();
   void InitServer(const std::string& dist_desc, int index);
   void InitWorker(const std::string& dist_desc,
                   const std::vector<uint64_t>& host_sign_list, int node_num,

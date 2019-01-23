@@ -460,20 +460,10 @@ void AsyncExecutorThreadWorker::UpdateParams() {
 }
 
 void AsyncExecutorThreadWorker::PushDense(int table_id) {
-  std::vector<paddle::ps::Region> regions;
-  for (auto& t : _param_config->dense_gradient_variable_name[table_id]) {
-    Variable* var = thread_scope_->FindVar(t);
-    CHECK(var != nullptr) << "var[" << t << "] not found";
-    LoDTensor* tensor = var->GetMutable<LoDTensor>();
-    int count = tensor->numel();
-    float* g = tensor->data<float>();
-    paddle::ps::Region reg(g, count);
-    regions.emplace_back(std::move(reg));
-  }
-
-  auto status = _pslib_ptr->_worker_ptr->push_dense(regions.data(),
-                                                    regions.size(), table_id);
-  _push_dense_status.push_back(std::move(status));
+    auto status = fleet_ptr_->PushDenseVar(
+             _param_config->dense_gradient_variable_name[table_id],
+             thread_scope_, table_id);
+    _push_dense_status.push_back(std::move(status));
 }
 
 void AsyncExecutorThreadWorker::PullSparse(int table_id) {
@@ -513,7 +503,6 @@ void AsyncExecutorThreadWorker::PullSparse(int table_id) {
 
   auto& push_g = _feature_push_value[table_id];
   check_pull_push_memory(features, &push_g, fea_dim);
-
   collect_feasign_info(table_id);
 }
 
