@@ -194,7 +194,8 @@ cc_library(parallel_executor SRCS parallel_executor.cc DEPS
 if(WITH_PSLIB)
     cc_library(async_executor SRCS async_executor.cc data_feed.cc data_feed_factory.cc
                               executor_thread_worker.cc multi_trainer.cc trainer_factory.cc
-			      trainer.cc device_worker.cc hogwild_worker.cc device_worker_factory.cc
+			      trainer.cc device_worker.cc hogwild_worker.cc 
+                              downpour_worker.cc pull_dense_worker.cc device_worker_factory.cc
 			      DEPS op_registry device_context scope framework_proto
 			      trainer_desc_proto device_worker_proto glog lod_rank_table
 			      feed_fetch_method graph_to_program_pass async_executor_proto
@@ -202,7 +203,8 @@ if(WITH_PSLIB)
 else()
     cc_library(async_executor SRCS async_executor.cc data_feed.cc data_feed_factory.cc
                               executor_thread_worker.cc multi_trainer.cc trainer_factory.cc
-			      trainer.cc device_worker.cc hogwild_worker.cc device_worker_factory.cc
+			      trainer.cc device_worker.cc hogwild_worker.cc
+                              downpour_worker.cc pull_dense_worker.cc device_worker_factory.cc
 			      DEPS op_registry device_context scope framework_proto
 			      trainer_desc_proto device_worker_proto glog lod_rank_table
 			      feed_fetch_method graph_to_program_pass async_executor_proto
