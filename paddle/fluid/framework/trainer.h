@@ -73,17 +73,18 @@ class MultiTrainer : public TrainerBase {
   std::vector<std::shared_ptr<DeviceWorker>> workers_;
 };
 
-/*
-class DistributedMultiTrainer : public MultiTrainer {
+
+class DistMultiTrainer : public MultiTrainer {
  public:
-  DistributedMultiTrainer() {}
-  virtual ~DistributedMultiTrainer() {}
+  DistMultiTrainer() {}
+  virtual ~DistMultiTrainer() {}
   virtual void InitOtherEnv();
 
  protected:
   std::shared_ptr<PullDenseWorker> pull_dense_thread_;
+  std::shared_ptr<FleetWrapper> fleet_ptr_;
 }
-*/
+
 
 }  // namespace framework
 }  // namespace paddle

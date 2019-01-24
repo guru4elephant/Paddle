@@ -51,14 +51,14 @@ message PullDenseWorkerParameter {
   repeated int32 threshold = 1 [default = 1];
   optional int32 device_num = 2;
   optional int32 sleep_time_ms = 3 [default = 2];
-  repeated string dense_var_name = 4;
+  repeated TableParameter dense_table = 4;
 }
 
 message TableParameter {
   // dense table only
-  optional int32 table_id = 1;
-  repeated string dense_var_name = 2;
-  repeated string dense_var_grad_name = 3;
+  optional int64 table_id = 1;
+  repeated string dense_value_name = 2;
+  repeated string dense_grad_name = 3;
   repeated int32 dense_table_size = 4;
   repeated int32 push_dense_wait_times = 5;
   // sparse table only

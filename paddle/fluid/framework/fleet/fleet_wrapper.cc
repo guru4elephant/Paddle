@@ -20,25 +20,27 @@ namespace framework {
 static const uint32_t MAX_FEASIGN_NUM = 1024 * 100 * 100;
 
 void FleetWrapper::InitServer(const std::string& dist_desc, int index) {
-  _pslib_ptr->init_server(dist_desc, index);
+  pslib_ptr_->init_server(dist_desc, index);
 }
 
 void FleetWrapper::InitWorker(const std::string& dist_desc,
                               const std::vector<uint64_t>& host_sign_list,
                               int node_num, int index) {
-  _pslib_ptr->init_worker(
+  pslib_ptr_->init_worker(
       dist_desc, const_cast<uint64_t*>(host_sign_list.data()), node_num, index);
 }
 
-void FleetWrapper::StopServer() { _pslib_ptr->stop_server(); }
+void FleetWrapper::StopServer() { pslib_ptr_->stop_server(); }
 
-uint64_t FleetWrapper::RunServer() { return _pslib_ptr->run_server(); }
+uint64_t FleetWrapper::RunServer() { return pslib_ptr_->run_server(); }
 
 void FleetWrapper::GatherServers(const std::vector<uint64_t>& host_sign_list,
                                  int node_num) {
-  _pslib_ptr->gather_servers(const_cast<uint64_t*>(host_sign_list.data()),
+  pslib_ptr_->gather_servers(const_cast<uint64_t*>(host_sign_list.data()),
                              node_num);
 }
+
+
 
 void FleetWrapper::PullSparseVarsSync(
                    vector<std::string>& var_names,
@@ -70,7 +72,7 @@ void FleetWrapper::PullSparseVarsSync(
         for (auto& t : fea_values) {
             pull_result_ptr.push_back(t.data());
         }
-        auto status = _pslib_ptr->_worker_ptr->pull_sparse(
+        auto status = pslib_ptr_->_worker_ptr->pull_sparse(
             pull_result_ptr.data(), table_id,
             fea_keys.data(), fea_keys.size());
         pull_sparse_status.push_back(std::move(status));
@@ -85,9 +87,29 @@ void FleetWrapper::PullSparseVarsSync(
     }
 }
 
-void FleetWrapper::PullDenseVarSync(
-                   vector<std::string>& var_names,
-                   const Scope& scope, uint64_t tid) {
+void FleetWrapper::PullDenseVarsAsync(
+                   const Scope& scope,
+                   const uint64_t tid,
+                   const vector<std::string>& var_names,
+                   std::vector<::std::future<int32_t>>* pull_dense_status>) {
+    std::vector<paddle::ps::Region> regions;
+    regions.reserve(var_names.size());
+    for (auto& t : var_names) {
+        Variable* var = scope->FindVar(t);
+        LoDTensor* tensor = var->GetMutable<LoDTensor>();
+        float* w = tensor->data<float>();
+        paddle::ps::Region reg(w, tensor->numel());
+        regions.emplace_back(std::move(reg));
+    }
+    auto& status = pslib_ptr_->worker_ptr->pull_dense(
+                    regions.data(), regions.size(), tid);
+    pull_dense_status.push_back(status);
+}
+
+void FleetWrapper::PullDenseVarsSync(
+                   const Scope& scope,
+                   const uint64_t tid,
+                   const vector<std::string>& var_names) {
     std::vector<paddle::ps::Region> regions;
     regions.reserve(var_names.size());
     for (auto& t : var_names) {
@@ -98,7 +120,7 @@ void FleetWrapper::PullDenseVarSync(
         regions.emplace_back(std::move(reg));
     }
     _pull_dense_status.push_back(
-        _pslib_ptr->worker_ptr->pull_dense(regions.data(), regions.size(), tid));
+        pslib_ptr_->worker_ptr->pull_dense(regions.data(), regions.size(), tid));
     for (auto& t : _pull_dense_status) {
         t.wait();
         auto status = t.get();
@@ -114,7 +136,7 @@ void FleetWrapper::PullDenseVarSync(
     _pull_dense_status.resize(0);
 }
 
-void FleetWrapper::PushDenseVarAsync(
+void FleetWrapper::PushDenseVarsAsync(
                    vector<std::string>& var_names,
                    const Scope& scope, int table_id,
                    std::vector<::std::future<int32_t>>* push_sparse_status) {
@@ -127,7 +149,7 @@ void FleetWrapper::PushDenseVarAsync(
         paddle::ps::Region reg(g, count);
         regions.emplace_back(std::move(reg));
     }
-    auto status = _pslib_ptr->worker_ptr->push_dense(
+    auto status = pslib_ptr_->worker_ptr->push_dense(
             regions.data(), regions.size(), table_id);
     push_sparse_status.push_back(status);
 }
