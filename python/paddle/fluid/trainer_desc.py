@@ -45,7 +45,7 @@ class MultiTrainer(TrainerDesc):
     def __init__(self, worker="Hogwild"):
         super(MultiTrainer, self).__init__()
         if worker == "Hogwild":
-            self.proto_desc.device_worker_name = worker
+            self.proto_desc.device_worker_name = worker + "Worker"
             self.proto_desc.class_name = "MultiTrainer"
         else:
             raise ValueError('ValueError: DeviceWorker %s '
@@ -56,7 +56,7 @@ class DistMultiTrainer(TrainerDesc):
     def __init__(self, worker='Downpour'):
         super(DistMultiTrainer, self).__init__()
         if worker == "Downpour":
-            self.proto_desc.device_worker_name = worker
+            self.proto_desc.device_worker_name = worker + "Worker"
             self.proto_desc.class_name = "DistMultiTrainer"
         else:
             raise ValueError('ValueError: DeviceWorker %s '
