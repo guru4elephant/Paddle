@@ -60,5 +60,6 @@ std::shared_ptr<DeviceWorker> DeviceWorkerFactory::CreateDeviceWorker(
 }
 
 REGISTER_DEVICE_WORKER_CLASS(HogwildWorker);
+REGISTER_DEVICE_WORKER_CLASS(DownpourWorker);
 }  // namespace framework
 }  // namespace paddle

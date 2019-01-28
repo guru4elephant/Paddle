@@ -31,12 +31,43 @@ message TrainerDesc {
 
   // device worker parameters
   optional HogwildWorkerParameter hogwild_param = 101;
-  // optional DownpourWorkerParameter downpour_param = 103;
+  optional DownpourWorkerParameter downpour_param = 103;
   optional PullDenseWorkerParameter pull_dense_param = 102;
   // datafeed desc
   optional DataFeedDesc data_desc = 201;
 }
 
-message PullDenseWorkerParameter {}
-
 message HogwildWorkerParameter {}
+
+message DownpourWorkerParameter {
+  repeated TableParameter sparse_table = 1;
+  repeated TableParameter dense_table = 2;
+  repeated string skip_ops = 3;
+  optional string label_var_name = 4;
+}
+
+message PullDenseWorkerParameter {
+  // dense table only and specialized usage
+  optional int32 threshold = 1 [ default = 1 ];
+  optional int32 device_num = 2;
+  optional int32 sleep_time_ms = 3 [ default = 2 ];
+  repeated TableParameter dense_table = 4;
+}
+
+message TableParameter {
+  // dense table only
+  optional int64 table_id = 1;
+  repeated string dense_value_name = 2;
+  repeated string dense_grad_name = 3;
+  repeated int32 dense_table_size = 4;
+  repeated int32 push_dense_wait_times = 5;
+  // sparse table only
+  repeated string sparse_key_name = 6;
+  repeated string sparse_value_name = 7;
+  repeated string sparse_grad_name = 8;
+  repeated int32 push_sparse_wait_times = 9;
+  // sparse table only and specialized usage
+  optional int32 emb_dim = 10;
+  optional int32 fea_dim = 11;
+  optional string label_var_name = 12;
+}

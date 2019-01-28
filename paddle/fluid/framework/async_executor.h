@@ -75,7 +75,6 @@ class AsyncExecutor {
   void GatherServers(const std::vector<uint64_t>& host_sign_list, int node_num);
   void InitModel();
   void SaveModel(const std::string& path);
-  void InitParamConfig();
 
  private:
   void CreateThreads(ExecutorThreadWorker* worker,
@@ -85,18 +84,13 @@ class AsyncExecutor {
                      Scope* root_scope, const int thread_index,
                      const bool debug);
 
-  // should be moved into trainer
-  void PrepareDenseThread(const std::string& mode);
-
  public:
-  std::shared_ptr<paddle::framework::FleetWrapper> _fleet_ptr;
-  // std::shared_ptr<DensePullThread> _pull_dense_thread;
-  // AsyncWorkerParamConfig _param_config;
+  std::shared_ptr<paddle::framework::FleetWrapper> fleet_ptr_;
   Scope* root_scope_;
   platform::Place place_;
 
  private:
-  int actual_thread_num;
+  int actual_thread_num_;
 };
 
 }  // namespace framework

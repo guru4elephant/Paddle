@@ -39,100 +39,24 @@ AsyncExecutor::AsyncExecutor(Scope* scope, const platform::Place& place)
     : root_scope_(scope), place_(place) {}
 
 void AsyncExecutor::InitServer(const std::string& dist_desc, int index) {
-  _fleet_ptr = FleetWrapper::GetInstance();
-  _fleet_ptr->InitServer(dist_desc, index);
+  fleet_ptr_ = FleetWrapper::GetInstance();
+  fleet_ptr_->InitServer(dist_desc, index);
 }
 
 void AsyncExecutor::InitWorker(const std::string& dist_desc,
                                const std::vector<uint64_t>& host_sign_list,
                                int node_num, int index) {
-  _fleet_ptr = FleetWrapper::GetInstance();
-  _fleet_ptr->InitWorker(dist_desc, host_sign_list, node_num, index);
-  InitParamConfig();
+  fleet_ptr_ = FleetWrapper::GetInstance();
+  fleet_ptr_->InitWorker(dist_desc, host_sign_list, node_num, index);
 }
 
-uint64_t AsyncExecutor::StartServer() { return _fleet_ptr->RunServer(); }
+uint64_t AsyncExecutor::StartServer() { return fleet_ptr_->RunServer(); }
 
-void AsyncExecutor::StopServer() { _fleet_ptr->StopServer(); }
+void AsyncExecutor::StopServer() { fleet_ptr_->StopServer(); }
 
 void AsyncExecutor::GatherServers(const std::vector<uint64_t>& host_sign_list,
                                   int node_num) {
-  _fleet_ptr->GatherServers(host_sign_list, node_num);
-}
-
-void AsyncExecutor::InitParamConfig() {
-  /*
-  for (int i = 0; i < _pslib_ptr->get_param()
-                          ->server_param()
-                          .downpour_server_param()
-                          .downpour_table_param_size();
-       ++i) {
-    if (_pslib_ptr->get_param()
-            ->server_param()
-            .downpour_server_param()
-            .downpour_table_param(i)
-            .table_class()
-            .find("SparseTable") != -1) {
-      _param_config.fea_dim = _pslib_ptr->get_param()
-                                  ->server_param()
-                                  .downpour_server_param()
-                                  .downpour_table_param(i)
-                                  .accessor()
-                                  .fea_dim();
-      break;
-    }
-  }
-  _param_config.slot_dim = _param_config.fea_dim - 2;
-  _param_config.tmp_push_dense_wait_times = static_cast<int32_t>(
-      _pslib_ptr->get_param()->trainer_param().push_dense_per_batch());
-  _param_config.tmp_push_sparse_wait_times = static_cast<int32_t>(
-      _pslib_ptr->get_param()->trainer_param().push_sparse_per_batch());
-
-  for (auto t = 0u; t < _pslib_ptr->get_param()->trainer_param().skip_op_size();
-       ++t) {
-    _param_config.skip_op.push_back(
-        _pslib_ptr->get_param()->trainer_param().skip_op(t));
-  }
-
-  for (auto t = 0u;
-       t < _pslib_ptr->get_param()->trainer_param().sparse_table_size(); ++t) {
-    auto& table = _pslib_ptr->get_param()->trainer_param().sparse_table(t);
-    std::vector<std::string> tmp_sparse_variable_name;
-    for (int i = 0u; i < table.slot_value_size(); ++i) {
-      tmp_sparse_variable_name.push_back(table.slot_value(i));
-      _param_config.slot_alias_to_table[table.slot_key(i)] = table.table_id();
-    }
-    std::vector<std::string> tmp_sparse_gradient_variable_name;
-    for (auto i = 0u; i < table.slot_gradient_size(); ++i) {
-      tmp_sparse_gradient_variable_name.push_back(table.slot_gradient(i));
-    }
-    _param_config.slot_input_vec[table.table_id()] =
-        std::move(tmp_sparse_variable_name);
-    _param_config.gradient_var[table.table_id()] =
-        std::move(tmp_sparse_gradient_variable_name);
-    _param_config.sparse_table_id.push_back(table.table_id());
-  }
-
-  for (auto t = 0u;
-       t < _pslib_ptr->get_param()->trainer_param().dense_table_size(); ++t) {
-    auto& table = _pslib_ptr->get_param()->trainer_param().dense_table(t);
-    std::vector<std::string> tmp_dense_variable_name;
-    for (int i = 0u; i < table.dense_variable_name_size(); ++i) {
-      tmp_dense_variable_name.push_back(table.dense_variable_name(i));
-    }
-    std::vector<std::string> tmp_dense_gradient_variable_name;
-    for (auto i = 0u; i < table.dense_gradient_variable_name_size(); ++i) {
-      tmp_dense_gradient_variable_name.push_back(
-          table.dense_gradient_variable_name(i));
-    }
-    _param_config.dense_variable_name[table.table_id()] =
-        std::move(tmp_dense_variable_name);
-    _param_config.dense_gradient_variable_name[table.table_id()] =
-        std::move(tmp_dense_gradient_variable_name);
-    _param_config.dense_table_id.push_back(table.table_id());
-    _param_config.dense_table_size.push_back(table.fea_dim());
-  }
-  */
+  fleet_ptr_->GatherServers(host_sign_list, node_num);
 }
 
 void AsyncExecutor::InitModel() {
@@ -186,51 +110,24 @@ void AsyncExecutor::SaveModel(const std::string& path) {
   */
 }
 
-void AsyncExecutor::PrepareDenseThread(const std::string& mode) {
-  /*
-  if (mode == "mpi") {
-    DensePullThreadParam param;
-    param.ps_client = _pslib_ptr->_worker_ptr;
-    param.threshold = 1;
-    param.training_thread_num = actual_thread_num;
-    param.root_scope = root_scope_;
-    param.dense_params = &_param_config.dense_variable_name;
-
-    _pull_dense_thread =
-        std::shared_ptr<DensePullThread>(new DensePullThread(param));
-    _pull_dense_thread->start();
-  }
-  */
-}
-
 void AsyncExecutor::RunFromFile(const ProgramDesc& main_program,
                                 const std::string& trainer_desc_str,
                                 const bool debug) {
   TrainerDesc trainer_desc;
   google::protobuf::TextFormat::ParseFromString(trainer_desc_str,
                                                 &trainer_desc);
-  LOG(WARNING) << "parse protobuf done.";
-  LOG(WARNING) << "trainer class " << trainer_desc.class_name();
   std::shared_ptr<TrainerBase> trainer;
   trainer = TrainerFactory::CreateTrainer(trainer_desc.class_name());
-  LOG(WARNING) << "create trainer done.";
   // initialize trainer
   trainer->Initialize(trainer_desc);
-  LOG(WARNING) << "initialization done.";
-  trainer->SetScope(root_scope_);
+  // trainer->SetRootScope(root_scope_);
   trainer->SetDebug(debug);
-  LOG(WARNING) << "set scope done.";
   // prepare training environment and helper environment
   trainer->InitTrainerEnv(main_program, place_);
-  LOG(WARNING) << "init train env done.";
   trainer->InitOtherEnv(main_program);
-  LOG(WARNING) << "init other env done.";
-
   // training and finalize training
   trainer->Run();
-  LOG(WARNING) << "run.";
   trainer->Finalize();
-  LOG(WARNING) << "finalize.";
   root_scope_->DropKids();
   return;
 }

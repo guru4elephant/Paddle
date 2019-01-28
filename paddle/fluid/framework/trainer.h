@@ -39,20 +39,12 @@ class TrainerBase {
   virtual ~TrainerBase() {}
   // model memory are hosted in root_scope
   void SetScope(Scope* root_scope);
-  // device worker and data feed will be created
-  virtual void Initialize(const TrainerDesc& trainer_desc);
-  // whether we need to run debug mode
+  void Initialize(const TrainerDesc& trainer_desc);
   void SetDebug(const bool debug) { debug_ = debug; }
-  // create execution resources for training
-  // mainly call CreateDeviceResouce of DeviceWorker
   virtual void InitTrainerEnv(const ProgramDesc& main_program,
                               const platform::Place& place) = 0;
-  // create other execution resources for training
-  // for example, prepare an helper thread in this function
   virtual void InitOtherEnv(const ProgramDesc& main_program) = 0;
-  // run computation logic in device workers here
   virtual void Run() = 0;
-  // finalize all resources created in Initialize()
   virtual void Finalize() = 0;
 
  protected:
@@ -81,17 +73,18 @@ class MultiTrainer : public TrainerBase {
   std::vector<std::shared_ptr<DeviceWorker>> workers_;
 };
 
-/*
-class DistributedMultiTrainer : public MultiTrainer {
+class DistMultiTrainer : public MultiTrainer {
  public:
-  DistributedMultiTrainer() {}
-  virtual ~DistributedMultiTrainer() {}
-  virtual void InitOtherEnv();
+  DistMultiTrainer() {}
+  virtual ~DistMultiTrainer() {}
+  virtual void Initialize(const TrainerDesc& trainer_desc);
+  virtual void InitOtherEnv(const ProgramDesc& main_program);
+  virtual void Finalize();
 
  protected:
-  std::shared_ptr<PullDenseWorker> pull_dense_thread_;
-}
-*/
+  std::shared_ptr<paddle::framework::PullDenseWorker> pull_dense_worker_;
+  std::shared_ptr<paddle::framework::FleetWrapper> fleet_ptr_;
+};
 
 }  // namespace framework
 }  // namespace paddle

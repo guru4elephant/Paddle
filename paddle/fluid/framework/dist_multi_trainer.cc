@@ -21,11 +21,11 @@ limitations under the License. */
 namespace paddle {
 namespace framework {
 
-void MultiTrainer::Initialize(const TrainerDesc& trainer_desc) {
+void DistMultiTrainer::Initialize(const TrainerDesc& trainer_desc) {
   thread_num_ = trainer_desc.thread_num();
-  // get filelist from trainer_desc here
   workers_.resize(thread_num_);
   readers_.resize(thread_num_);
+
   for (int i = 0; i < thread_num_; ++i) {
     workers_[i] = DeviceWorkerFactory::CreateDeviceWorker(
         trainer_desc.device_worker_name());
@@ -35,34 +35,27 @@ void MultiTrainer::Initialize(const TrainerDesc& trainer_desc) {
     readers_[i]->Init(trainer_desc.data_desc());
     workers_[i]->SetDataFeed(readers_[i]);
   }
+
   std::vector<std::string> filelist_vec;
   for (unsigned i = 0; i < trainer_desc.filelist_size(); ++i) {
     filelist_vec.push_back(trainer_desc.filelist(i));
   }
+
+  fleet_ptr_ = FleetWrapper::GetInstance();
+  pull_dense_worker_ = PullDenseWorker::GetInstance();
+  pull_dense_worker_->Initialize(trainer_desc);
 }
 
-// call only after all resources are set in current trainer
-void MultiTrainer::InitTrainerEnv(const ProgramDesc& main_program,
-                                  const platform::Place& place) {
-  for (int i = 0; i < thread_num_; ++i) {
-    workers_[i]->SetPlace(place);
-    workers_[i]->SetRootScope(root_scope_);
-    workers_[i]->CreateDeviceResource(main_program);  // Program
-    workers_[i]->BindingDataFeedMemory();
-  }
+void DistMultiTrainer::InitOtherEnv(const ProgramDesc& main_program) {
+  pull_dense_worker_->SetScope(root_scope_);
+  pull_dense_worker_->Start();
 }
 
-void MultiTrainer::Run() {
-  for (int thidx = 0; thidx < thread_num_; ++thidx) {
-    threads_.push_back(
-        std::thread(&DeviceWorker::TrainFiles, workers_[thidx].get()));
-  }
-}
-
-void MultiTrainer::Finalize() {
+void DistMultiTrainer::Finalize() {
   for (auto& th : threads_) {
     th.join();
   }
+  pull_dense_worker_->Stop();
 }
 
 }  // end namespace framework

@@ -50,24 +50,20 @@ void HogwildWorker::CreateThreadScope(const ProgramDesc& program) {
 
 void HogwildWorker::BindingDataFeedMemory() {
   const std::vector<std::string>& input_feed =
-      device_reader_->GetUseSlotAlias();
-  LOG(WARNING) << "create input feed";
+      thread_reader_->GetUseSlotAlias();
   for (auto name : input_feed) {
-    LOG(WARNING) << "input feed name: " << name;
-    device_reader_->AddFeedVar(thread_scope_->Var(name), name);
+    thread_reader_->AddFeedVar(thread_scope_->Var(name), name);
   }
 }
 
 void HogwildWorker::CreateDeviceResource(const ProgramDesc& main_prog) {
-  LOG(WARNING) << "begin to create thread scope";
   CreateThreadScope(main_prog);
-  LOG(WARNING) << "begin to create thread operators";
   CreateThreadOperators(main_prog);
 }
 
 void HogwildWorker::TrainFilesWithProfiler() {
   platform::SetNumThreads(1);
-  device_reader_->Start();
+  thread_reader_->Start();
   std::vector<double> op_total_time;
   std::vector<std::string> op_name;
   for (auto& op : ops_) {
@@ -83,7 +79,7 @@ void HogwildWorker::TrainFilesWithProfiler() {
   int cur_batch;
   int batch_cnt = 0;
   timeline.Start();
-  while ((cur_batch = device_reader_->Next()) > 0) {
+  while ((cur_batch = thread_reader_->Next()) > 0) {
     timeline.Pause();
     read_time += timeline.ElapsedSec();
     total_time += timeline.ElapsedSec();
@@ -119,10 +115,10 @@ void HogwildWorker::TrainFiles() {
   platform::SetNumThreads(1);
 
   // how to accumulate fetched values here
-  device_reader_->Start();
+  thread_reader_->Start();
   int cur_batch;
   int batch_cnt = 0;
-  while ((cur_batch = device_reader_->Next()) > 0) {
+  while ((cur_batch = thread_reader_->Next()) > 0) {
     for (auto& op : ops_) {
       op->Run(*thread_scope_, place_);
     }

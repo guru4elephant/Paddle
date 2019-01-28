@@ -20,14 +20,87 @@ limitations under the License. */
 #endif
 #include <string>
 #include <vector>
+#include "paddle/fluid/framework/scope.h"
+#include "paddle/fluid/framework/variable_helper.h"
 #include "paddle/fluid/platform/macros.h"  // for DISABLE_COPY_AND_ASSIGN
 
 namespace paddle {
 namespace framework {
+
+// A wrapper class for pslib.h, this class follows Singleton pattern
+// i.e. only initialized once in the current process
+// Example:
+//    std::shared_ptr<FleetWrapper> fleet_ptr =
+//         FleetWrapper::GetInstance();
+//    string dist_desc;
+//    fleet_ptr->InitServer(dist_desc, 0);
+// interface design principles:
+// Pull
+//   Sync: PullSparseVarsSync
+//   Async: PullSparseVarsAsync(not implemented currently)
+// Push
+//   Sync: PushSparseVarsSync
+//   Async: PushSparseVarsAsync
+// Push dense variables to server in Async mode
+// Param<in>: scope, table_id, var_names
+// Param<out>: push_sparse_status
+
 class FleetWrapper {
  public:
   FleetWrapper() {}
   virtual ~FleetWrapper() {}
+
+  // Pull sparse variables from server in Sync mode
+  // Param<in>: scope, table_id, var_names, fea_keys
+  // Param<out>: fea_values
+  void PullSparseVarsSync(const Scope& scope, const uint64_t table_id,
+                          const std::vector<std::string>& var_names,
+                          std::vector<uint64_t>* fea_keys,
+                          std::vector<std::vector<float>>* fea_values,
+                          int fea_dim);
+
+  void PullDenseVarsSync(const Scope& scope, const uint64_t table_id,
+                         const std::vector<std::string>& var_names);
+
+  void PullDenseVarsAsync(
+      const Scope& scope, const uint64_t table_id,
+      const std::vector<std::string>& var_names,
+      std::vector<::std::future<int32_t>>* pull_dense_status);
+
+  // Push dense variables to server in async mode
+  // Param<in>: scope, table_id, var_names,
+  // Param<out>: push_sparse_status
+  void PushDenseVarsAsync(
+      const Scope& scope, const uint64_t table_id,
+      const std::vector<std::string>& var_names,
+      std::vector<::std::future<int32_t>>* push_sparse_status);
+
+  // Push sparse variables with labels to server in Async mode
+  // This is specially designed for click/show stats in server
+  // Param<in>: scope, table_id, var_grad_names,
+  //            fea_keys, fea_labels, sparse_grad_names
+  // Param<out>: push_values, push_sparse_status
+  void PushSparseVarsWithLabelAsync(
+      const Scope& scope, const uint64_t table_id,
+      const std::vector<uint64_t>& fea_keys,
+      const std::vector<float>& fea_labels,
+      const std::vector<std::string>& sparse_key_names,
+      const std::vector<std::string>& sparse_grad_names, const int emb_dim,
+      std::vector<std::vector<float>>* push_values,
+      std::vector<::std::future<int32_t>>* push_sparse_status);
+
+  // Push sparse variables to server in Async mode
+  // Param<In>: scope, table_id, fea_keys, sparse_grad_names
+  // Param<Out>: push_values, push_sparse_status
+  /*
+  void PushSparseVarsAsync(
+          const Scope& scope,
+          const uint64_t table_id,
+          const std::vector<uint64_t>& fea_keys,
+          const std::vector<std::string>& sparse_grad_names,
+          std::vector<std::vector<float>>* push_values,
+          std::vector<::std::future<int32_t>>* push_sparse_status);
+  */
 
   void InitServer(const std::string& dist_desc, int index);
   void InitWorker(const std::string& dist_desc,
@@ -37,20 +110,20 @@ class FleetWrapper {
   uint64_t RunServer();
   void GatherServers(const std::vector<uint64_t>& host_sign_list, int node_num);
 
-  static std::shared_ptr<FleetWrapper> _s_instance;
+  static std::shared_ptr<FleetWrapper> s_instance_;
   static std::shared_ptr<FleetWrapper> GetInstance() {
-    if (NULL == _s_instance) {
-      _s_instance.reset(new paddle::framework::FleetWrapper());
+    if (NULL == s_instance_) {
+      s_instance_.reset(new paddle::framework::FleetWrapper());
     }
-    return _s_instance;
+    return s_instance_;
   }
 
 #ifdef PADDLE_WITH_PSLIB
-  std::shared_ptr<paddle::distributed::PSlib> _pslib_ptr;
+  static std::shared_ptr<paddle::distributed::PSlib> pslib_ptr_;
 #endif
 
  protected:
-  bool _is_initialized;
+  bool is_initialized_;
   DISABLE_COPY_AND_ASSIGN(FleetWrapper);
 };
 
