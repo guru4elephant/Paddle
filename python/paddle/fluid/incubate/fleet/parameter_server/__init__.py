@@ -153,6 +153,10 @@ class Fleet(object):
             # barrier_all for init_server, wait for server starts
             self.role_maker_._barrier_all()
             self.all_ips_ = self.role_maker_._all_gather(self.local_ip_)
+
+            with open("fleet_desc", "w") as f:
+                f.write(self._dist_desc_str)
+
             self._fleet_ptr.init_worker(self._dist_desc_str, self.all_ips_,
                                         self.role_maker_._get_size(),
                                         self.role_maker_._get_rank())
@@ -227,19 +231,90 @@ class Fleet(object):
         """
         return self.role_maker_._is_server()
 
-    def init_pserver_model(self):
+    def load_pserver_model(self, load_path, mode="0"):
         """
         init pserver model called from pserver
         """
+        self.role_maker_._barrier_worker()
         if self.role_maker_._is_first_worker():
-            self._fleet_ptr.init_model()
+            self._fleet_ptr.load_model(load_path, mode)
         self.role_maker_._barrier_worker()
 
-    def save_pserver_model(self, save_path):
+    def save_pserver_model(self, save_path, mode="0"):
         """
         save pserver model called from a worker
         """
-        self._fleet_ptr.save_model(save_path)
+        #self.role_maker_._barrier_worker()
+        self._fleet_ptr.server_flush()
+        self.role_maker_._barrier_worker()
+        if self.role_maker_._is_first_worker():    
+            self._fleet_ptr.save_model(save_path, mode)
+        self.role_maker_._barrier_worker()
+
+    def split_filelist(self, filelist):
+        """
+        split filelist before distributed training,
+        for example, filelist is [a, b, c ,d, e]  and trainer_num = 2,
+        then trainer 0 gets [a, b, c] and trainer 1 gets [d, e]
+
+        Args:
+            filelist(list): list of filename, can be local or hdfs/afs.
+
+        Returns: list of filename which belongs to this trainer.
+        """
+        file_num = len(filelist)
+        trainer_id = self.get_worker_index()
+        trainer_num = self.get_worker_num()
+        if trainer_num > file_num:
+            raise ValueError(
+                "trainer_num should be <= file_num : "
+                "%s > %s" % (trainer_num, file_num)
+            )
+        # get interval of filelist, it's [ )
+        start = 0
+        end = 0
+        for i in range(0, trainer_id + 1):
+            length = file_num / trainer_num + (i < (file_num % trainer_num))
+            start = end
+            end += length
+        myfilelist = filelist[start : end]
+        return myfilelist
+
+    def shrink_sparse_table(self):
+        self.role_maker_._barrier_worker()
+        if self.role_maker_._is_first_worker():
+            #import ps_pb2 as pslib
+            #from google.protobuf import text_format
+            #ps_param = pslib.PSParameter()
+            #text_format.Merge(self._opt_info["fleet_desc"], ps_param)
+            for i in self._opt_info["fleet_desc"].trainer_param.sparse_table:
+                print "shrink_sparse_table ", i.table_id
+                #print type(i)
+                self._fleet_ptr.shrink_sparse_table(i.table_id)
+                print "shrink_sparse_table ", i.table_id, " done "
+        self.role_maker_._barrier_worker()
+
+    def shrink_dense_table(self, decay, scope, table_id):
+        self.role_maker_._barrier_worker()
+        if self.role_maker_._is_first_worker():
+            for i in self._opt_info["fleet_desc"].trainer_param.dense_table:
+                if table_id != i.table_id:
+                    continue
+                print "shrink_dense_table ", i.table_id
+                var_list = [var for var in i.dense_variable_name]
+                print "var_list ", var_list
+                skip = False
+                for var in var_list:
+                    if scope.find_var(var) is None:
+                        print var," not found in given scope, skip shrink_dense_table ", i.table_id
+                        skip = True
+                        break
+                if skip:
+                    continue 
+                print "shrink_dense_table ", i.table_id
+                self._fleet_ptr.shrink_dense_table(i.table_id, scope, var_list, decay)
+                print "shrink_dense_table ", i.table_id, " done "
+        self.role_maker_._barrier_worker()
 
     def _set_opt_info(self, opt_info):
         """
@@ -332,8 +407,11 @@ init_pserver = fleet_instance.init_pserver
 init_worker = fleet_instance.init_worker
 is_worker = fleet_instance.is_worker
 is_server = fleet_instance.is_server
-init_pserver_model = fleet_instance.init_pserver_model
+load_pserver_model = fleet_instance.load_pserver_model
 save_pserver_model = fleet_instance.save_pserver_model
 worker_num = fleet_instance.get_worker_num
 server_num = fleet_instance.get_server_num
 worker_index = fleet_instance.get_worker_index
+split_filelist = fleet_instance.split_filelist
+shrink_sparse_table = fleet_instance.shrink_sparse_table
+shrink_dense_table = fleet_instance.shrink_dense_table

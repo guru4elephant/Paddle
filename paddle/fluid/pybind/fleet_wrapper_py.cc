@@ -53,7 +53,14 @@ void BindFleetWrapper(py::module* m) {
       .def("gather_clients", &framework::FleetWrapper::GatherClients)
       .def("get_clients_info", &framework::FleetWrapper::GetClientsInfo)
       .def("create_client2client_connection",
-           &framework::FleetWrapper::CreateClient2ClientConnection);
+           &framework::FleetWrapper::CreateClient2ClientConnection)
+      .def("save_model", &framework::FleetWrapper::SaveModel)
+      .def("load_model", &framework::FleetWrapper::LoadModel)
+      .def("shrink_sparse_table", &framework::FleetWrapper::ShrinkSparseTable)
+      .def("shrink_dense_table", &framework::FleetWrapper::ShrinkDenseTable)
+      .def("server_flush", &framework::FleetWrapper::ServerFlush);
+      //.def("get_memory_data_size", &framework::FleetWrapper::GetMemoryDataSize)
+      //.def("get_channel_data_size", &framework::FleetWrapper::GetChannelDataSize);
 }  // end FleetWrapper
 }  // end namespace pybind
 }  // end namespace paddle

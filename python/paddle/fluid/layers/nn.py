@@ -193,6 +193,7 @@ __all__ = [
     'npair_loss',
     'pixel_shuffle',
     'fsp_matrix',
+    'continuous_value_model',
 ]
 
 kIgnoreIndex = -100
@@ -2624,8 +2625,8 @@ def pool3d(input,
                           the number of channels, D is the depth of the feature,
                           H is the height of the feature, and W is the width
                           of the feature.
-        pool_size (int|list|tuple): The pool kernel size. If pool kernel size 
-            is a tuple or list, it must contain three integers, 
+        pool_size (int|list|tuple): The pool kernel size. If pool kernel size
+            is a tuple or list, it must contain three integers,
             (pool_size_Depth, pool_size_Height, pool_size_Width).
             Otherwise, the pool kernel size will be the cube of an int.
         pool_type (string): ${pooling_type_comment}
@@ -3446,7 +3447,7 @@ def spectral_norm(weight, dim=0, power_iters=1, eps=1e-12, name=None):
     :attr:`power_iters` shoule be a positive interger, do following
     calculations with U and V for :attr:`power_iters` rounds.
 
-    .. math:: 
+    .. math::
 
         \mathbf{v} := \\frac{\mathbf{W}^{T} \mathbf{u}}{\|\mathbf{W}^{T} \mathbf{u}\|_2}
 
@@ -3460,7 +3461,7 @@ def spectral_norm(weight, dim=0, power_iters=1, eps=1e-12, name=None):
         \sigma(\mathbf{W}) = \mathbf{u}^{T} \mathbf{W} \mathbf{v}
 
         \mathbf{W} = \\frac{\mathbf{W}}{\sigma(\mathbf{W})}
-                
+
 
     Refer to `Spectral Normalization <https://arxiv.org/abs/1802.05957>`_ .
 
@@ -4211,7 +4212,7 @@ def beam_search(pre_ids,
              accumulated scores.
         name(str|None): A name for this layer(optional). If set None, the layer
                         will be named automatically.
-        return_parent_idx(bool): Whether to return an extra Tensor variable 
+        return_parent_idx(bool): Whether to return an extra Tensor variable
                         preserving the selected_ids' parent indice in pre_ids
                         in output, which can be used to gather cell states at
                         the next time step.
@@ -6095,50 +6096,50 @@ def sampled_softmax_with_cross_entropy(logits,
     """
     **Sampled Softmax With Cross Entropy Operator.**
 
-    Cross entropy loss with sampled softmax is used as the output layer for 
+    Cross entropy loss with sampled softmax is used as the output layer for
     larger output classes extensively. This operator samples a number of samples
-    for all examples, and computes the softmax normalized values for each 
-    row of the sampled tensor, after which cross-entropy loss is computed. 
+    for all examples, and computes the softmax normalized values for each
+    row of the sampled tensor, after which cross-entropy loss is computed.
 
     Because this operator performs a softmax on logits internally, it expects
     unscaled logits. This operator should not be used with the output of
     softmax operator since that would produce incorrect results.
-    
+
     For examples with T true labels (T >= 1), we assume that each true label has
     a probability of 1/T. For each sample, S samples are generated using a
     log uniform distribution. True labels are concatenated with these samples to
     form T + S samples for each example. So, assume the shape of logits is
-    [N x K], the shape for samples is [N x (T+S)]. For each sampled label, a 
-    probability is calculated, which corresponds to the Q(y|x) in 
+    [N x K], the shape for samples is [N x (T+S)]. For each sampled label, a
+    probability is calculated, which corresponds to the Q(y|x) in
     [Jean et al., 2014](http://arxiv.org/abs/1412.2007).
-    
-    Logits are sampled according to the sampled labels. Then if 
-    remove_accidental_hits is True, if a sample[i, j] accidentally hits true 
-    labels, then the corresponding sampled_logits[i, j] is minus by 1e20 to 
+
+    Logits are sampled according to the sampled labels. Then if
+    remove_accidental_hits is True, if a sample[i, j] accidentally hits true
+    labels, then the corresponding sampled_logits[i, j] is minus by 1e20 to
     make its softmax result close to zero. Then sampled logits are subtracted by
-    logQ(y|x), these sampled logits and re-indexed labels are used to compute 
+    logQ(y|x), these sampled logits and re-indexed labels are used to compute
     a softmax with cross entropy.
 
     Args:
         logits (Variable): The unscaled log probabilities, which is a 2-D tensor
             with shape [N x K]. N is the batch_size, and K is the class number.
-        label (Variable): The ground truth which is a 2-D tensor. Label is a 
-            Tensor<int64> with shape [N x T], where T is the number of true 
-            labels per example. 
-        num_samples (int): The number for each example, num_samples should be 
+        label (Variable): The ground truth which is a 2-D tensor. Label is a
+            Tensor<int64> with shape [N x T], where T is the number of true
+            labels per example.
+        num_samples (int): The number for each example, num_samples should be
             less than the number of class.
         num_true(int): The number of target classes per training example.
-        remove_accidental_hits (bool): A flag indicating whether to remove 
-            accidental hits when sampling. If True and if a sample[i, j] 
-            accidentally hits true labels, then the corresponding 
-            sampled_logits[i, j] is minus by 1e20 to make its softmax result 
+        remove_accidental_hits (bool): A flag indicating whether to remove
+            accidental hits when sampling. If True and if a sample[i, j]
+            accidentally hits true labels, then the corresponding
+            sampled_logits[i, j] is minus by 1e20 to make its softmax result
             close to zero. Default is True.
         use_customized_samples (bool): Whether to use custom samples and probabities to sample
             logits.
         customized_samples (Variable): User defined samples, which is a 2-D tensor
-            with shape [N, T + S]. S is the num_samples, and T is the number of true 
-            labels per example. 
-        customized_probabilities (Variable): User defined probabilities of samples, 
+            with shape [N, T + S]. S is the num_samples, and T is the number of true
+            labels per example.
+        customized_probabilities (Variable): User defined probabilities of samples,
             a 2-D tensor which has the same shape with customized_samples.
         seed (int): The random seed for generating random number, which is used
             in the process of sampling. Default is 0.
@@ -7057,16 +7058,16 @@ def image_resize(input,
         'NEAREST' : Nearest neighbor interpolation
 
     Nearest neighbor interpolation is to perform nearest neighbor interpolation
-    in both the 3rd dimention(in height direction) and the 4th dimention(in width 
+    in both the 3rd dimention(in height direction) and the 4th dimention(in width
     direction) on input tensor.
-            
-    Bilinear interpolation is an extension of linear interpolation for 
-    interpolating functions of two variables (e.g. H-direction and 
-    W-direction in this op) on a rectilinear 2D grid. The key idea is 
-    to perform linear interpolation first in one direction, and then 
+
+    Bilinear interpolation is an extension of linear interpolation for
+    interpolating functions of two variables (e.g. H-direction and
+    W-direction in this op) on a rectilinear 2D grid. The key idea is
+    to perform linear interpolation first in one direction, and then
     again in the other direction.
 
-    Align_corners and align_mode are optinal parameters,the calculation method 
+    Align_corners and align_mode are optinal parameters,the calculation method
     of interpolation can be selected by them.
 
     Example:
@@ -7074,18 +7075,18 @@ def image_resize(input,
     .. code-block:: text
 
         For scale:
-          
+
             if align_corners = True && out_size > 1 :
 
               scale_factor = (in_size-1.0)/(out_size-1.0)
-            
+
             else:
-              
+
               scale_factor = float(in_size/out_size)
-            
-          
+
+
         Nearest neighbor interpolation:
-          
+
           if:
               align_corners = False
 
@@ -7108,25 +7109,25 @@ def image_resize(input,
 
           if:
               align_corners = False , align_mode = 0
-              
+
               input : (N,C,H_in,W_in)
               output: (N,C,H_out,W_out) where:
-              
+
               H_out = (H_{in}+0.5) * scale_{factor} - 0.5
               W_out = (W_{in}+0.5) * scale_{factor} - 0.5
 
           else:
-           
+
               input : (N,C,H_in,W_in)
               output: (N,C,H_out,W_out) where:
 
               H_out = H_{in} * scale_{factor}
               W_out = W_{in} * scale_{factor}
 
-    For details of nearest neighbor interpolation, please refer to Wikipedia: 
+    For details of nearest neighbor interpolation, please refer to Wikipedia:
     https://en.wikipedia.org/wiki/Nearest-neighbor_interpolation.
 
-    For details of bilinear interpolation, please refer to Wikipedia: 
+    For details of bilinear interpolation, please refer to Wikipedia:
     https://en.wikipedia.org/wiki/Bilinear_interpolation.
 
 
@@ -7160,12 +7161,12 @@ def image_resize(input,
                                 set, otherwise errors would be occured in graph
                                 constructing stage.
                                 Default: None
-        align_corners(bool) :  An optional bool, If True, the centers of the 4 corner pixels of the 
-                               input and output tensors are aligned, preserving the values at the 
+        align_corners(bool) :  An optional bool, If True, the centers of the 4 corner pixels of the
+                               input and output tensors are aligned, preserving the values at the
                                corner pixels.
                                Default: True
-        align_mode(int)  :  An optional for bilinear interpolation. can be \'0\' 
-                            for src_idx = scale*(dst_indx+0.5)-0.5 , can be \'1\' for 
+        align_mode(int)  :  An optional for bilinear interpolation. can be \'0\'
+                            for src_idx = scale*(dst_indx+0.5)-0.5 , can be \'1\' for
                             src_idx = scale*dst_index .
 
     Returns:
@@ -7273,7 +7274,7 @@ def resize_bilinear(input,
     For details of bilinear interpolation, please refer to Wikipedia:
     https://en.wikipedia.org/wiki/Bilinear_interpolation
 
-    Align_corners and align_mode are optinal parameters,the calculation 
+    Align_corners and align_mode are optinal parameters,the calculation
     method of interpolation can be selected by them.
 
     Example:
@@ -7281,23 +7282,23 @@ def resize_bilinear(input,
     .. code-block:: text
 
         For scale:
-          
+
             if align_corners = True && out_size > 1 :
 
               scale_factor = (in_size-1.0)/(out_size-1.0)
-            
+
             else:
-              
-              scale_factor = float(in_size/out_size)     
+
+              scale_factor = float(in_size/out_size)
 
         Bilinear interpolation:
 
           if:
               align_corners = False , align_mode = 0
-              
+
               input : (N,C,H_in,W_in)
               output: (N,C,H_out,W_out) where:
-              
+
               H_out = (H_{in}+0.5) * scale_{factor} - 0.5
               W_out = (W_{in}+0.5) * scale_{factor} - 0.5
 
@@ -7369,18 +7370,18 @@ def resize_nearest(input,
     .. code-block:: text
 
         For scale:
-          
+
             if align_corners = True && out_size > 1 :
 
               scale_factor = (in_size-1.0)/(out_size-1.0)
-            
+
             else:
-              
+
               scale_factor = float(in_size/out_size)
-            
-          
+
+
         Nearest neighbor interpolation:
-          
+
           if:
               align_corners = False
 
@@ -10377,7 +10378,7 @@ def shuffle_channel(x, group, name=None):
 
     Please refer to the paper
     https://arxiv.org/pdf/1707.01083.pdf
-    
+
     .. code-block:: text
 
         Given a 4-D tensor input with the shape (N, C, H, W):
@@ -10398,22 +10399,22 @@ def shuffle_channel(x, group, name=None):
             out.shape = (1, 4, 2, 2)
             out.data = [[[[0.1, 0.2],
                           [0.2, 0.3]],
-                          
+
                          [[0.5, 0.6],
                           [0.6, 0.7]],
-                          
+
                          [[0.3, 0.4],
                           [0.4, 0.5]],
-                          
+
                          [[0.7, 0.8],
                           [0.8, 0.9]]]]
-                        
-    Args: 
+
+    Args:
         x(Variable): The input tensor variable. It should be a 4-D tensor with shape [N, C, H, W]
         group(int): Indicating the conuts of subgroups, It should divide the number of channels.
 
     Returns:
-        out(Variable): the channels shuffling result is a tensor variable with the 
+        out(Variable): the channels shuffling result is a tensor variable with the
         same shape and same type as the input.
 
     Raises:
@@ -10444,17 +10445,17 @@ def shuffle_channel(x, group, name=None):
 def temporal_shift(x, seg_num, shift_ratio=0.25, name=None):
     """
     **Temporal Shift Operator**
-    
+
     ${comment}
-                        
-    Args: 
+
+    Args:
         x(Variable): ${x_comment}
         seg_num(int): ${seg_num_comment}
         shift_ratio(float): ${shift_ratio_comment}
         name (str, default None): The name of this layer.
 
     Returns:
-        out(Variable): The temporal shifting result is a tensor variable with the 
+        out(Variable): The temporal shifting result is a tensor variable with the
         same shape and same type as the input.
 
     Raises:
@@ -10844,9 +10845,9 @@ def tree_conv(nodes_vector,
               param_attr=None,
               bias_attr=None,
               name=None):
-    """ 
+    """
     ${comment}
-    		
+
     Args:
         nodes_vector(${nodes_vector_type}): ${nodes_vector_comment}
         edge_set(${edge_set_type}): ${edge_set_comment}
@@ -10971,19 +10972,19 @@ def pixel_shuffle(x, upscale_factor):
     to a tensor of shape [N, C/r**2, H*r, W*r].
     This is useful for implementing efficient sub-pixel convolution
     with a stride of 1/r.
-    Please refer to the paper: `Real-Time Single Image and Video Super-Resolution 
+    Please refer to the paper: `Real-Time Single Image and Video Super-Resolution
     Using an Efficient Sub-Pixel Convolutional Neural Network <https://arxiv.org/abs/1609.05158v2>`_ .
     by Shi et. al (2016) for more details.
 
         .. code-block:: text
-        
+
             Given a 4-D tensor with the shape:
                 x.shape = [1, 9, 4, 4]
             Given upscale_factor:
                 upscale_factor= 3
             output shape is:
                 [1, 1, 12, 12]
-    
+
     Args:
 
         x(Variable): The input tensor variable.
@@ -11062,3 +11063,14 @@ def fsp_matrix(x, y):
         input_param_name='x'))
     helper.append_op(type='fsp', inputs={'X': x, 'Y': y}, outputs={'Out': out})
     return out
+
+def continuous_value_model(input, cvm, use_cvm=True):
+    helper = LayerHelper('cvm', **locals())
+    out = helper.create_variable(dtype=input.dtype)
+    helper.append_op(
+                    type='cvm',
+                    inputs={'X': [input], 'CVM': [cvm]},
+                    outputs={'Y': [out]},
+                    attrs={"use_cvm": use_cvm})
+    return out
+

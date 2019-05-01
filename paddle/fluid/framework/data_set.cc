@@ -131,7 +131,7 @@ void DatasetImpl<T>::LoadIntoMemory() {
     t.join();
   }
   timeline.Pause();
-  VLOG(3) << "DatasetImpl<T>::LoadIntoMemory() end"
+  VLOG(0) << "DatasetImpl<T>::LoadIntoMemory() end"
           << ", memory data size=" << memory_data_.size()
           << ", cost time=" << timeline.ElapsedSec() << " seconds";
 }
@@ -191,7 +191,7 @@ void DatasetImpl<T>::GlobalShuffle() {
   }
   std::vector<T>().swap(memory_data_);
   timeline.Pause();
-  VLOG(3) << "DatasetImpl<T>::GlobalShuffle() end, cost time="
+  VLOG(0) << "DatasetImpl<T>::GlobalShuffle() end, cost time="
           << timeline.ElapsedSec() << " seconds";
 }
 

@@ -40,6 +40,7 @@ void DistMultiTrainer::Initialize(const TrainerDesc& trainer_desc,
     workers_[i]->SetDeviceIndex(i);
     workers_[i]->SetDataFeed(readers[i]);
     workers_[i]->Initialize(trainer_desc);
+    workers_[i]->SetUpdateAucLock(&_update_auc_mutex);
   }
 
   VLOG(3) << "going to initialize pull dense worker";

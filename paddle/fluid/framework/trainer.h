@@ -55,6 +55,7 @@ class TrainerBase {
   Scope* root_scope_;
   bool debug_;
   Dataset* dataset_ptr_;
+  std::mutex _update_auc_mutex;
 };
 
 // general trainer for async execution

@@ -85,6 +85,9 @@ class Dataset {
   virtual void CreateReaders() = 0;
   // destroy readers
   virtual void DestroyReaders() = 0;
+  
+  virtual int64_t GetMemoryDataSize()  = 0;
+  virtual int64_t GetChannelDataSize() = 0;
 
  protected:
   virtual int ReceiveFromClient(int msg_type, int client_id,
@@ -127,6 +130,18 @@ class DatasetImpl : public Dataset {
   virtual void GlobalShuffle();
   virtual void CreateReaders();
   virtual void DestroyReaders();
+
+  virtual int64_t GetMemoryDataSize() {
+    return memory_data_.size();
+  }
+
+  virtual int64_t GetChannelDataSize() {
+    uint64_t sum = 0 ;
+    for (int i = 0; i < readers_.size(); ++i) {
+        sum += 0;//readers_->GetChannelDataSize();
+    }
+    return sum;
+  }
 
  protected:
   virtual int ReceiveFromClient(int msg_type, int client_id,

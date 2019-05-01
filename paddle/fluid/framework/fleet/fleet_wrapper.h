@@ -99,7 +99,8 @@ class FleetWrapper {
       const std::vector<std::string>& sparse_key_names,
       const std::vector<std::string>& sparse_grad_names, const int emb_dim,
       std::vector<std::vector<float>>* push_values,
-      std::vector<::std::future<int32_t>>* push_sparse_status);
+      std::vector<::std::future<int32_t>>* push_sparse_status,
+      int cur_batch);
 
   // Push sparse variables to server in Async mode
   // Param<In>: scope, table_id, fea_keys, sparse_grad_names
@@ -127,6 +128,76 @@ class FleetWrapper {
   std::vector<uint64_t> GetClientsInfo();
   // create client to client connection
   void CreateClient2ClientConnection();
+
+
+  void LoadModel(const std::string& path,
+                               const std::string& mode) {
+    auto ret = pslib_ptr_->_worker_ptr->load(path, mode);
+    ret.wait();
+    if (ret.get() != 0) {
+      LOG(ERROR) << "load model from path:" << path << " failed";
+      exit(-1);
+    }
+  }
+
+  void ServerFlush() {
+    auto ret = pslib_ptr_->_worker_ptr->flush();
+    ret.wait();
+  }
+
+  // param = 0, save all feature
+  // param = 1, save delta feature
+  void SaveModel(const std::string& path, const std::string& mode) {
+    //auto ret = pslib_ptr_->_worker_ptr->flush();
+    //ret.wait();
+    auto ret = pslib_ptr_->_worker_ptr->save(path, mode);
+    ret.wait();
+    int32_t feasign_cnt = ret.get();
+    if (feasign_cnt == -1) {
+        LOG(FATAL) << "save model failed";
+        exit(-1);
+    }
+  }
+
+  void ShrinkSparseTable(int table_id) {
+    auto ret = pslib_ptr_->_worker_ptr->shrink(table_id);
+    ret.wait();
+  }
+
+  void ShrinkDenseTable(int table_id, Scope* scope, std::vector<std::string> var_list, float decay) {
+    std::vector<paddle::ps::Region> regions;
+    for (std::string& name : var_list) {
+      if (name.find("batch_sum") != std::string::npos) {
+Variable* var = scope->FindVar(name);
+                    CHECK(var != nullptr) << "var[" << name << "] not found";
+                    LOG(ERROR) << "prepare shrink dense batch_sum";
+                    LoDTensor* tensor = var->GetMutable<LoDTensor>();
+                    float* g = tensor->data<float>();
+                    //CHECK(g != nullptr) << "var[" << t << "] value not initialized";
+                    Eigen::Map<Eigen::MatrixXf> mat(g, 1, tensor->numel());
+                    
+                    mat *= decay;
+                    paddle::ps::Region reg(g, tensor->numel());
+                    regions.emplace_back(std::move(reg));
+      } else {
+           Variable* var = scope->FindVar(name);
+                    CHECK(var != nullptr) << "var[" << name << "] not found";
+                    LoDTensor* tensor = var->GetMutable<LoDTensor>();
+                    float* g = tensor->data<float>();
+                    //CHECK(g != nullptr) << "var[" << t << "] value not initialized";
+                    paddle::ps::Region reg(g, tensor->numel());
+                    regions.emplace_back(std::move(reg));  
+     // }
+    }
+auto push_status = pslib_ptr_->_worker_ptr->push_dense_param(regions.data(), regions.size(), table_id);
+                push_status.wait();
+                auto status = push_status.get();
+                if (status != 0) {
+                    LOG(FATAL) << "push shrink dense param failed, status[" << status << "]";
+                    exit(-1);
+                }
+  }
+  }
 
   // register client to client communication
   typedef std::function<int32_t(int, int, const std::string&)> MsgHandlerFunc;

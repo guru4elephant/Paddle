@@ -166,6 +166,10 @@ void FleetWrapper::PullSparseVarsSync(
       fea_keys->push_back(static_cast<uint64_t>(ids[i]));
     }
   }
+  //VLOG(0) << "fea_keys->size() " << fea_keys->size();
+  //for (auto& i : *fea_keys) {
+    //VLOG(0) << i;
+  //}
   fea_values->resize(fea_keys->size() + 1);
   for (auto& t : *fea_values) {
     t.resize(fea_value_dim);
@@ -281,9 +285,10 @@ void FleetWrapper::PushSparseVarsWithLabelAsync(
     const std::vector<std::string>& sparse_key_names,
     const std::vector<std::string>& sparse_grad_names, const int emb_dim,
     std::vector<std::vector<float>>* push_values,
-    std::vector<::std::future<int32_t>>* push_sparse_status) {
+    std::vector<::std::future<int32_t>>* push_sparse_status,
+    int cur_batch) {
 #ifdef PADDLE_WITH_PSLIB
-  int offset = 2;
+  //int offset = 2;
   uint64_t fea_idx = 0u;
   for (size_t i = 0; i < sparse_key_names.size(); ++i) {
     Variable* g_var = scope.FindVar(sparse_grad_names[i]);
@@ -305,23 +310,54 @@ void FleetWrapper::PushSparseVarsWithLabelAsync(
     int64_t* ids = tensor->data<int64_t>();
     push_values->resize(fea_keys.size() + 1);
     for (auto& t : *push_values) {
-      t.resize(emb_dim + offset);
+      t.resize(/*emb_dim + offset*/11);
     }
+
+    //Eigen::Map<Eigen::MatrixXf> g_mat(g, 1, g_tensor->numel());
+    //g_mat *= /*batch_size*/32;
+    //std::stringstream ss;
+   // VLOG(0) << g_tensor->numel() << " "  << g_tensor->numel() / 11.0;
+   // for (int i = 0; i < g_tensor->numel(); ++i) {
+   //     if (i % 11 == 0) ss << "\n";
+   //     ss << g[i] << ",";
+   // }
+    //VLOG(0) << "before " << ss.str();
+    //const int64_t a = g_tensor->numel() / 11;
+    Eigen::Map<Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor>> g_mat(g, g_tensor->numel() / 11, 11);
+    //Eigen::Map<Eigen::MatrixXf> g_mat(g, g_tensor->numel() / 11, 11);
+    //VLOG(0) << "rows " << g_mat.rows();
+ //   VLOG(0) << "cols " << g_mat.cols();
+ //   VLOG(0) << "top 2 rows " << g_mat.topRows(2);
+    //Eigen::Map<Eigen::Matrix<float, a, 11, Eigen::RowMajor>> g_mat(g);
+    //VLOG(0) << "cur_batch " << cur_batch;
+    for (int i = 2; i < 11; ++i) {
+        //VLOG(0) << "col " << i << " " << g_mat.col(i);
+        g_mat.col(i) *= /*32*/cur_batch;
+        //VLOG(0) << "mul32 col " << i << " " << g_mat.col(i);
+    }
+    std::stringstream ss1;
+    for (int i = 0; i < g_tensor->numel(); ++i) {
+        if (i % 11 == 0) ss1 << "\n";
+        ss1 << g[i] << ",";
+    }
+    //VLOG(0) << "after " << ss1.str();
 
     for (auto id_idx = 0u; id_idx < len; ++id_idx) {
       if (ids[id_idx] == 0) {
-        g += emb_dim;
+        g += /*emb_dim*/11;
         continue;
       }
       CHECK(fea_idx < (*push_values).size());
       CHECK(fea_idx < fea_labels.size());
-      memcpy((*push_values)[fea_idx].data() + offset, g,
-             sizeof(float) * emb_dim);
-      (*push_values)[fea_idx][0] = 1.0f;
-      (*push_values)[fea_idx][1] = static_cast<float>(fea_labels[fea_idx]);
-      g += emb_dim;
+      memcpy((*push_values)[fea_idx].data() /*+ offset*/, g,
+             sizeof(float) * /*emb_dim*/11);
+      //(*push_values)[fea_idx][0] = 1.0f;
+      //(*push_values)[fea_idx][1] = static_cast<float>(fea_labels[fea_idx]);
+      g += /*emb_dim*/11;
       fea_idx++;
     }
+    //Eigen::Map<Eigen::MatrixXf> g_mat(g, 1, g_tensor->numel());
+    //g_mat *= /*batch_size*/32;
   }
   CHECK(fea_idx == fea_keys.size()) << "fea_idx: " << fea_idx
                                     << "features size: " << fea_keys.size();

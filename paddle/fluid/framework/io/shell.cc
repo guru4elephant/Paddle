@@ -194,7 +194,7 @@ std::shared_ptr<FILE> shell_popen(const std::string& cmd,
                            << ", err_no[" << *err_no << "]";
             }
             if (wstatus == -1 && errno == ECHILD) {
-              LOG(WARNING) << "errno is ECHILD";
+              //LOG(WARNING) << "errno is ECHILD";
             }
           }};
 #endif

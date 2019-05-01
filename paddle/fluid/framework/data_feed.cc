@@ -209,6 +209,7 @@ int InMemoryDataFeed<T>::Next() {
   if (DataFeed::batch_size_ != 0) {
     PutToFeedVec(ins_vec);
   } else {
+    VLOG(0) << "consume " << out_channel->Size();
     cur_channel_ = 1 - cur_channel_;
   }
   return DataFeed::batch_size_;
@@ -396,6 +397,7 @@ void InMemoryDataFeed<T>::GlobalShuffle() {
                 << ", thread_id=" << thread_id_;
         auto ret = fleet_ptr->SendClientToClientMsg(0, j, send_str);
         VLOG(3) << "end send, thread_id=" << thread_id_;
+        sleep(2);
         send_vec[j].clear();
         total_status.push_back(std::move(ret));
       }
@@ -412,6 +414,7 @@ void InMemoryDataFeed<T>::GlobalShuffle() {
               << ", thread_id=" << thread_id_;
       auto ret = fleet_ptr->SendClientToClientMsg(0, j, send_str);
       VLOG(3) << "end send, thread_id=" << thread_id_;
+      sleep(2);
       total_status.push_back(std::move(ret));
     }
     std::vector<T*>().swap(send_vec[j]);
@@ -811,13 +814,17 @@ bool MultiSlotInMemoryDataFeed::ParseOneInstanceFromPipe(
     for (size_t i = 0; i < use_slots_index_.size(); ++i) {
       int idx = use_slots_index_[i];
       int num = strtol(&str[pos], &endptr, 10);
+      if (num <= 0) {
+        VLOG(0) << "num is zero , slot=" << idx << " " << i << " " <<use_slots_index_.size();
+        VLOG(0) << str;
+      }
       PADDLE_ENFORCE(
-          num,
+         num,
           "The number of ids can not be zero, you need padding "
-          "it in data generator; or if there is something wrong with "
+         "it in data generator; or if there is something wrong with "
           "the data, please check if the data contains unresolvable "
           "characters.\nplease check this error line: %s",
-          str);
+         str);
       if (idx != -1) {
         (*instance)[idx].Init(all_slots_type_[i]);
         if ((*instance)[idx].GetType()[0] == 'f') {  // float

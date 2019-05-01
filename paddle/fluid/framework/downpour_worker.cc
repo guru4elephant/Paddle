@@ -132,20 +132,20 @@ void DownpourWorker::FillSparseValue(size_t table_idx) {
     int len = tensor->numel();
     Variable* var_emb = thread_scope_->FindVar(emb_slot_name);
     LoDTensor* tensor_emb = var_emb->GetMutable<LoDTensor>();
-    float* ptr = tensor_emb->mutable_data<float>({len, table.emb_dim()},
+    float* ptr = tensor_emb->mutable_data<float>({len, /*table.emb_dim()*/11},
                                                  platform::CPUPlace());
-    memset(ptr, 0, sizeof(float) * len * table.emb_dim());
+    memset(ptr, 0, sizeof(float) * len * /*table.emb_dim()*/11);
     auto& tensor_lod = tensor->lod()[0];
     LoD data_lod{tensor_lod};
     tensor_emb->set_lod(data_lod);
     for (auto index = 0u; index < len; ++index) {
       if (ids[index] == 0u) {
-        memcpy(ptr + table.emb_dim() * index, init_value.data() + 2,
-               sizeof(float) * table.emb_dim());
+        memcpy(ptr + /*table.emb_dim()*/11 * index, init_value.data() /*+ 2*/,
+               sizeof(float) * /*table.emb_dim()*/11);
         continue;
       }
-      memcpy(ptr + table.emb_dim() * index, fea_value[fea_idx].data() + 2,
-             sizeof(float) * table.emb_dim());
+      memcpy(ptr + /*table.emb_dim()*/11 * index, fea_value[fea_idx].data() /*+ 2*/,
+             sizeof(float) * /*table.emb_dim()*/11);
       fea_idx++;
     }
   }
@@ -259,7 +259,8 @@ void DownpourWorker::TrainFilesWithProfiler() {
         fleet_ptr_->PushSparseVarsWithLabelAsync(
             *thread_scope_, tid, features_[tid], feature_labels_[tid],
             sparse_key_names_[tid], sparse_grad_names_[tid], table.emb_dim(),
-            &feature_grads_[tid], &push_sparse_status_);
+            &feature_grads_[tid], &push_sparse_status_,
+            cur_batch);
         timeline.Pause();
         push_sparse_time += timeline.ElapsedSec();
         total_time += timeline.ElapsedSec();
@@ -360,6 +361,7 @@ void DownpourWorker::TrainFiles() {
   device_reader_->Start();
   int batch_cnt = 0;
   int cur_batch;
+  //bool first = true;
   while ((cur_batch = device_reader_->Next()) > 0) {
     // pull sparse here
     for (size_t i = 0; i < param_.program_config(0).pull_sparse_table_id_size();
@@ -367,9 +369,9 @@ void DownpourWorker::TrainFiles() {
       uint64_t tid = static_cast<uint64_t>(
           param_.program_config(0).pull_sparse_table_id(i));
       TableParameter table;
-      for (auto i : param_.sparse_table()) {
-        if (i.table_id() == tid) {
-          table = i;
+      for (auto j : param_.sparse_table()) {
+        if (j.table_id() == tid) {
+          table = j;
           break;
         }
       }
@@ -391,11 +393,82 @@ void DownpourWorker::TrainFiles() {
         }
       }
       if (!need_skip) {
-        op->Run(*thread_scope_, place_);
+        if (op->Type().find("auc") != std::string::npos) {
+          //{
+          //  std::lock_guard<std::mutex> lck(*_update_auc_mutex);
+            op->Run(*thread_scope_, place_);
+          //}
+        } else if (op->Type().find("sgd") != std::string::npos) {
+
+        } else {
+          op->Run(*thread_scope_, place_);
+        }
       }
     }
 
+    std::vector<std::string> params{
+    "concat_1.tmp_0",
+        "fc_0.tmp_2",
+        "fc_1.tmp_2",
+        "fc_2.tmp_2",
+        "fc_3.tmp_2",
+        "fc_4.tmp_2",
+        "fc_5.tmp_2"
+        "reduce_sum_0.tmp_0",
+     "concat_1.tmp_0@GRAD",
+     "fc_0.w_0",
+     "fc_0.b_0",
+     "fc_1.w_0",
+     "fc_1.b_0",
+     "fc_2.w_0",
+     "fc_2.b_0",
+     "fc_3.w_0",
+     "fc_3.b_0",
+     "fc_4.w_0",
+     "fc_4.b_0",
+    "fc_5.w_0",
+    "fc_5.b_0",
+    "fc_0.b_0@GRAD","fc_0.w_0@GRAD",
+    "fc_1.b_0@GRAD", "fc_1.w_0@GRAD",
+    "fc_2.b_0@GRAD", "fc_2.w_0@GRAD",
+    "fc_3.b_0@GRAD", "fc_3.w_0@GRAD",
+    "fc_4.b_0@GRAD", "fc_4.w_0@GRAD",
+    "fc_5.b_0@GRAD", "fc_5.w_0@GRAD",
+//    "fc_6.b_0@GRAD", "fc_6.w_0@GRAD",
+//    "fc_7.b_0@GRAD", "fc_7.w_0@GRAD",
+//    "fc_8.b_0@GRAD", "fc_8.w_0@GRAD",
+//    "fc_9.b_0@GRAD", "fc_9.w_0@GRAD",
+//    "fc_10.b_0@GRAD", "fc_10.w_0@GRAD",
+//    "fc_11.b_0@GRAD", "fc_11.w_0@GRAD",
+    "bnconcat_1.tmp_0.batch_size@GRAD",
+    "bnconcat_1.tmp_0.batch_square_sum@GRAD",
+    "bnconcat_1.tmp_0.batch_sum@GRAD",
+//    "bnconcat_2.tmp_0.batch_size@GRAD",
+//    "bnconcat_2.tmp_0.batch_square_sum@GRAD",
+ //   "bnconcat_2.tmp_0.batch_sum@GRAD"
+    };
+    for (auto i : params) {
+        std::stringstream ss;
+        ss << i << " ";
+        Variable* a = thread_scope_->FindVar(i);
+        if (a == NULL) {
+            continue;
+        }
+        LoDTensor* tensor = a->GetMutable<LoDTensor>();
+        float* w = tensor->data<float>();
+        int n = tensor->numel();
+        for (int j= 0; j < n; ++j) {
+            ss << w[j] << ",";
+        }
+        VLOG(0) << ss.str();
+    }
+    //*/
+
+//    if (first)
+//        VLOG(0) << "1 need_to_push_sparse_ " << need_to_push_sparse_;
     if (need_to_push_sparse_) {
+//       if (first)
+//           VLOG(0) << "2 need_to_push_sparse_ " << need_to_push_sparse_;
       // push gradients here
       for (size_t i = 0;
            i < param_.program_config(0).push_sparse_table_id_size(); ++i) {
@@ -411,11 +484,14 @@ void DownpourWorker::TrainFiles() {
         fleet_ptr_->PushSparseVarsWithLabelAsync(
             *thread_scope_, tid, features_[tid], feature_labels_[tid],
             sparse_key_names_[tid], sparse_grad_names_[tid], table.emb_dim(),
-            &feature_grads_[tid], &push_sparse_status_);
+            &feature_grads_[tid], &push_sparse_status_, cur_batch);
       }
     }
-
+//    if (first)
+//        VLOG(0) << "1 need_to_push_dense_ " << need_to_push_dense_;
     if (need_to_push_dense_) {
+//      if (first)
+//          VLOG(0) << "2 need_to_push_dense_ " << need_to_push_dense_;
       for (size_t i = 0;
            i < param_.program_config(0).push_dense_table_id_size(); ++i) {
         uint64_t tid = static_cast<uint64_t>(
@@ -468,6 +544,7 @@ void DownpourWorker::TrainFiles() {
         pull_dense_worker_->IncreaseThreadVersion(thread_id_, tid);
       }
     }
+    //first = false;
 
     PrintFetchVars();
     thread_scope_->DropKids();

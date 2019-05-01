@@ -116,6 +116,10 @@ class DataFeed {
   // This function will do nothing at default
   virtual void PutInsToChannel(const std::string& ins_str) {}
 
+  virtual int64_t GetChannelDataSize() {
+    return 0;  
+  } 
+
  protected:
   // The following three functions are used to check if it is executed in this
   // order:
@@ -376,6 +380,14 @@ class MultiSlotInMemoryDataFeed
                             std::string* str);
   virtual void DeserializeIns(std::vector<std::vector<MultiSlotType>>* ins,
                               const std::string& str);
+
+  virtual int64_t GetChannelDataSize() {
+      if (cur_channel_ == 0) {
+        return 0;//shuffled_ins_->size();
+      } else {
+        return  0;//shuffled_ins_out_->size();
+      }
+  }
 };
 
 }  // namespace framework

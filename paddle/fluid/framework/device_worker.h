@@ -48,6 +48,7 @@ class PullDenseWorker {
   void IncreaseThreadVersion(int thread_id, uint64_t table_id);
   void ResetThreadVersion(uint64_t table_id);
   void Wait(std::vector<::std::future<int32_t>>* status_vec);
+  void PullDense();
   static std::shared_ptr<PullDenseWorker> GetInstance() {
     if (NULL == s_instance_) {
       s_instance_.reset(new paddle::framework::PullDenseWorker());
@@ -107,6 +108,9 @@ class DeviceWorker {
   virtual void SetPlace(const paddle::platform::Place& place) {
     place_ = place;
   }
+  virtual void SetUpdateAucLock(std::mutex* mutex) {
+    _update_auc_mutex = mutex;
+  }
 
  protected:
   Scope* root_scope_;
@@ -114,6 +118,7 @@ class DeviceWorker {
   std::shared_ptr<DataFeed> device_reader_;
   int64_t batch_num_;
   FetchConfig fetch_config_;
+  std::mutex* _update_auc_mutex;
 };
 
 class CPUWorkerBase : public DeviceWorker {

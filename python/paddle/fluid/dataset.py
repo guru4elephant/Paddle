@@ -194,6 +194,7 @@ class InMemoryDataset(DatasetBase):
         """
         super(InMemoryDataset, self).__init__()
         self.proto_desc.name = "MultiSlotInMemoryDataFeed"
+        self.prefetching = False
 
     def load_into_memory(self):
         """
@@ -208,6 +209,7 @@ class InMemoryDataset(DatasetBase):
         """
         self._prepare_to_run()
         self.dataset.load_into_memory()
+        return self.dataset.get_memory_data_size()
 
     def local_shuffle(self):
         """
@@ -253,7 +255,21 @@ class InMemoryDataset(DatasetBase):
         self.dataset.global_shuffle()
         if fleet is not None:
             fleet.fleet_instance.role_maker_._barrier_worker()
+        return self.dataset.get_channel_data_size()
 
+    def release_memory(self):
+        self.dataset.release_memory()
+
+    #def prefetch(self, shuffle_mode="local", fleet=None):
+    #    if shuffle_mode == "global" and fleet is None:
+    #        raise ValueError("fleet should not be None when global shuffle")
+    #    elif self.prefetching is True:
+    #        raise RuntimeError("dataset is doing prefetch, should not prefetch again")
+    #    self.prefetching = True
+    #    self.dataset.prefetch()
+    #
+    #def wait_prefetch_done(self):
+    #    self.prefetching = False
 
 class QueueDataset(DatasetBase):
     """

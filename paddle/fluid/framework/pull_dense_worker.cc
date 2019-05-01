@@ -85,12 +85,22 @@ void PullDenseWorker::Stop() {
 
 int PullDenseWorker::Start() {
   running_ = true;
+  for (size_t i = 0;
+          i < dwp_param_.program_config(0).pull_dense_table_id_size(); ++i) {
+    uint64_t tid = static_cast<uint64_t>(
+            dwp_param_.program_config(0).pull_dense_table_id(i));
+    fleet_ptr_->PullDenseVarsAsync(*root_scope_, tid, dense_value_names_[tid], &pull_dense_status_);
+    ResetThreadVersion(tid);
+  }
+  if (pull_dense_status_.size() != 0) {
+    Wait(&pull_dense_status_);
+  }
+  //PullDense();
   t_ = std::thread(&PullDenseWorker::Run, this);
   return 0;
 }
 
-void PullDenseWorker::Run() {
-  while (running_) {
+void PullDenseWorker::PullDense() {
     pull_dense_status_.resize(0);
     for (size_t i = 0;
          i < dwp_param_.program_config(0).pull_dense_table_id_size(); ++i) {
@@ -105,6 +115,11 @@ void PullDenseWorker::Run() {
     if (pull_dense_status_.size() != 0) {
       Wait(&pull_dense_status_);
     }
+}
+
+void PullDenseWorker::Run() {
+  while (running_) {
+    PullDense();    
 #ifndef _WIN32
     usleep(sleep_time_ms_ * 1000);
 #endif
