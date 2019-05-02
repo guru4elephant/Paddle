@@ -59,8 +59,11 @@ ExternalProject_Add(
     ${EXTERNAL_PROJECT_LOG_ARGS}
     PREFIX                ${PSLIB_SOURCE_DIR}
     DOWNLOAD_DIR          ${PSLIB_DOWNLOAD_DIR}
-    DOWNLOAD_COMMAND      wget --no-check-certificate ${PSLIB_URL} -c -q -O ${PSLIB_NAME}.tar.gz
-                          && tar zxvf ${PSLIB_NAME}.tar.gz
+    #DOWNLOAD_COMMAND      wget --no-check-certificate ${PSLIB_URL} -c -q -O ${PSLIB_NAME}.tar.gz
+    #                      && tar zxvf ${PSLIB_NAME}.tar.gz
+    #    DOWNLOAD_COMMAND cp /home/disk1/xujiaqi/shuffle_test/submit-pslib-cupai-fleet/new_pslib/pslib.tar.gz . && tar -zxvf pslib.tar.gz
+    DOWNLOAD_COMMAND  wget ftp://10.89.160.42:8099/paddle/pslib.tar.gz . && tar -zxvf pslib.tar.gz
+    #cp /home/disk1/xujiaqi/mycode/baidu/paddlepaddle/pslib/pslib.tar.gz . && tar -zxvf pslib.tar.gz
     DOWNLOAD_NO_PROGRESS  1
     UPDATE_COMMAND        ""
     CMAKE_ARGS            -DCMAKE_INSTALL_PREFIX=${PSLIB_INSTALL_ROOT}
