@@ -118,7 +118,9 @@ class DataFeed {
 
   virtual int64_t GetChannelDataSize() {
     return 0;  
-  } 
+  }
+
+  virtual void ReleaseChannelData() { }
 
  protected:
   // The following three functions are used to check if it is executed in this
@@ -225,6 +227,13 @@ class InMemoryDataFeed : public PrivateQueueDataFeed<T> {
   virtual void LoadIntoMemory();
   virtual void LocalShuffle();
   virtual void GlobalShuffle();
+  virtual void ReleaseChannelData() {
+    if (cur_channel_ == 0) {
+      shuffled_ins_->Clear();
+    } else {
+      shuffled_ins_out_->Clear();
+    }
+  }
 
  protected:
   virtual void AddInstanceToInsVec(T* vec_ins, const T& instance,
@@ -383,9 +392,9 @@ class MultiSlotInMemoryDataFeed
 
   virtual int64_t GetChannelDataSize() {
       if (cur_channel_ == 0) {
-        return 0;//shuffled_ins_->size();
+        return shuffled_ins_->Size();
       } else {
-        return  0;//shuffled_ins_out_->size();
+        return  shuffled_ins_out_->Size();
       }
   }
 };

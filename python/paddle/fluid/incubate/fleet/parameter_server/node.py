@@ -130,6 +130,7 @@ class DownpourServer(Server):
         table.accessor.accessor_class = "DownpourDenseValueAccessor"
         table.accessor.dense_sgd_param.name = "summary"
         table.accessor.dense_sgd_param.summary.summary_decay_rate = 0.999999
+        #print "summary_decay_rate = 1"
         fea_dim = 0
         for param in filter(lambda x: x.name.find("embedding") == -1,
                             param_var):

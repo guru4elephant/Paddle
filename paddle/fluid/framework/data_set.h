@@ -138,7 +138,7 @@ class DatasetImpl : public Dataset {
   virtual int64_t GetChannelDataSize() {
     uint64_t sum = 0 ;
     for (int i = 0; i < readers_.size(); ++i) {
-        sum += 0;//readers_->GetChannelDataSize();
+        sum += readers_[i]->GetChannelDataSize();
     }
     return sum;
   }

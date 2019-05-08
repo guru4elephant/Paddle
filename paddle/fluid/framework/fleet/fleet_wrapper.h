@@ -217,6 +217,53 @@ auto push_status = pslib_ptr_->_worker_ptr->push_dense_param(regions.data(), reg
     return s_instance_;
   }
 
+//  double current_realtime() {
+//    struct timespec tp;
+//    clock_gettime(CLOCK_REALTIME, &tp);
+//    return tp.tv_sec + tp.tv_nsec * 1e-9;
+//  }
+/*
+  std::default_random_engine& LocalRandomEngine() {
+    //struct timespec tp;
+    //clock_gettime(CLOCK_REALTIME, &tp);
+    //double current_realtime = tp.tv_sec + tp.tv_nsec * 1e-9;
+    double current_realtime() {
+            struct timespec tp;
+                clock_gettime(CLOCK_REALTIME, &tp);
+                    return tp.tv_sec + tp.tv_nsec * 1e-9;
+    }
+    struct engine_wrapper_t {
+        //struct timespec tp;
+        //clock_gettime(CLOCK_REALTIME, &tp);
+        //double current_realtime = tp.tv_sec + tp.tv_nsec * 1e-9;
+        std::default_random_engine engine;
+        engine_wrapper_t() {
+            static std::atomic<unsigned long> x(0);
+            std::seed_seq sseq = {x++, x++, x++, (unsigned long)(current_realtime() * 1000)};
+            engine.seed(sseq);
+        }
+    };
+    thread_local engine_wrapper_t r;
+    return r.engine;
+}
+*/
+std::default_random_engine& LocalRandomEngine() {
+  struct engine_wrapper_t {
+    std::default_random_engine engine;
+    engine_wrapper_t() {
+      struct timespec tp;
+      clock_gettime(CLOCK_REALTIME, &tp);
+      double cur_time = tp.tv_sec + tp.tv_nsec * 1e-9;
+      static std::atomic<uint64_t> x(0);
+      std::seed_seq sseq = {x++, x++, x++, (uint64_t)(cur_time * 1000)};
+      engine.seed(sseq);
+    }
+  };
+  thread_local engine_wrapper_t r;
+  return r.engine;
+}
+
+
 #ifdef PADDLE_WITH_PSLIB
   static std::shared_ptr<paddle::distributed::PSlib> pslib_ptr_;
 #endif
@@ -231,6 +278,25 @@ auto push_status = pslib_ptr_->_worker_ptr->push_dense_param(regions.data(), reg
   static bool is_initialized_;
   DISABLE_COPY_AND_ASSIGN(FleetWrapper);
 };
+
+/*double current_realtime() {
+    struct timespec tp;
+    clock_gettime(CLOCK_REALTIME, &tp);
+    return tp.tv_sec + tp.tv_nsec * 1e-9;
+}
+
+std::default_random_engine& local_random_engine() {
+    struct engine_wrapper_t {
+        std::default_random_engine engine;
+        engine_wrapper_t() {
+            static std::atomic<unsigned long> x(0);
+            std::seed_seq sseq = {x++, x++, x++, (unsigned long)(current_realtime() * 1000)};
+            engine.seed(sseq);
+        }
+    };
+    thread_local engine_wrapper_t r;
+    return r.engine;
+}*/
 
 }  // end namespace framework
 }  // end namespace paddle

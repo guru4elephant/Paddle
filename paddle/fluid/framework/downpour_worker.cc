@@ -358,6 +358,7 @@ void DownpourWorker::TrainFilesWithProfiler() {
 void DownpourWorker::TrainFiles() {
   VLOG(3) << "Begin to train files";
   platform::SetNumThreads(1);
+  SetDevice();
   device_reader_->Start();
   int batch_cnt = 0;
   int cur_batch;
@@ -407,14 +408,34 @@ void DownpourWorker::TrainFiles() {
     }
 
     std::vector<std::string> params{
+    "embedding_73.tmp_0",
+    "embedding_73.tmp_0@GRAD",
+    "embedding_74.tmp_0",
+    "embedding_74.tmp_0@GRAD",
+    "embedding_75.tmp_0",
+    "embedding_75.tmp_0@GRAD",
+    "embedding_80.tmp_0",
+    "embedding_80.tmp_0@GRAD",
+    "embedding_81.tmp_0",
+    "embedding_81.tmp_0@GRAD",
+    "embedding_3.tmp_0",
+    "embedding_3.tmp_0@GRAD",
+    "embedding_4.tmp_0",
+    "embedding_4.tmp_0@GRAD",
     "concat_1.tmp_0",
+    "_generated_var_119",
+        "fc_0.tmp_0",
+	"fc_0.tmp_1",
         "fc_0.tmp_2",
         "fc_1.tmp_2",
         "fc_2.tmp_2",
         "fc_3.tmp_2",
         "fc_4.tmp_2",
-        "fc_5.tmp_2"
+        "fc_5.tmp_2",
+	"elementwise_mul_0",
         "reduce_sum_0.tmp_0",
+	"elementwise_add_0",
+	"_generated_var_123",
      "concat_1.tmp_0@GRAD",
      "fc_0.w_0",
      "fc_0.b_0",
@@ -447,8 +468,9 @@ void DownpourWorker::TrainFiles() {
 //    "bnconcat_2.tmp_0.batch_square_sum@GRAD",
  //   "bnconcat_2.tmp_0.batch_sum@GRAD"
     };
-    for (auto i : params) {
+/*    for (auto i : params) {
         std::stringstream ss;
+	VLOG(0) << i;
         ss << i << " ";
         Variable* a = thread_scope_->FindVar(i);
         if (a == NULL) {
@@ -457,12 +479,15 @@ void DownpourWorker::TrainFiles() {
         LoDTensor* tensor = a->GetMutable<LoDTensor>();
         float* w = tensor->data<float>();
         int n = tensor->numel();
+	VLOG(0) << n;
+	ss << " numel= " << n << " "; 
         for (int j= 0; j < n; ++j) {
             ss << w[j] << ",";
         }
         VLOG(0) << ss.str();
     }
-    //*/
+  */ 
+//    */
 
 //    if (first)
 //        VLOG(0) << "1 need_to_push_sparse_ " << need_to_push_sparse_;
@@ -490,12 +515,17 @@ void DownpourWorker::TrainFiles() {
 //    if (first)
 //        VLOG(0) << "1 need_to_push_dense_ " << need_to_push_dense_;
     if (need_to_push_dense_) {
+        VLOG(3) << "need_to_push_dense_ " << need_to_push_dense_;
 //      if (first)
 //          VLOG(0) << "2 need_to_push_dense_ " << need_to_push_dense_;
       for (size_t i = 0;
            i < param_.program_config(0).push_dense_table_id_size(); ++i) {
         uint64_t tid = static_cast<uint64_t>(
             param_.program_config(0).push_dense_table_id(i));
+        //VLOG(0) << "tid " << tid;
+        //for (auto&i : dense_grad_names_[tid]) {
+        //  VLOG(0) << i;
+        //}
         fleet_ptr_->PushDenseVarsAsync(
             *thread_scope_, tid, dense_grad_names_[tid], &push_sparse_status_);
       }

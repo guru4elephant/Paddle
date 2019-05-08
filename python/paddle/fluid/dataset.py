@@ -255,7 +255,7 @@ class InMemoryDataset(DatasetBase):
         self.dataset.global_shuffle()
         if fleet is not None:
             fleet.fleet_instance.role_maker_._barrier_worker()
-        return self.dataset.get_channel_data_size()
+        return self.dataset.get_shuffle_data_size()
 
     def release_memory(self):
         self.dataset.release_memory()

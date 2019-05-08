@@ -111,6 +111,7 @@ class DeviceWorker {
   virtual void SetUpdateAucLock(std::mutex* mutex) {
     _update_auc_mutex = mutex;
   }
+  virtual void SetDevice() {}
 
  protected:
   Scope* root_scope_;
@@ -170,6 +171,39 @@ class DownpourWorker : public HogwildWorker {
   void FillSparseValue(size_t table_id);
   void PushGradients();
   void CollectLabelInfo(size_t table_id);
+
+void SetDevice() {
+#if defined _WIN32 || defined __APPLE__
+  return;
+#else
+  static unsigned concurrency_cap = std::thread::hardware_concurrency();
+  //LOG(WARNING) << "concurrency capacity " << concurrency_cap;
+  int thread_id = this->thread_id_;
+
+  if (static_cast<unsigned>(thread_id) < concurrency_cap) {
+    unsigned proc = thread_id;
+
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(proc, &mask);
+
+    if (-1 == sched_setaffinity(0, sizeof(mask), &mask)) {
+      VLOG(1) << "WARNING: Failed to set thread affinity for thread "
+              << thread_id;
+    } else {
+      CPU_ZERO(&mask);
+      if ((0 != sched_getaffinity(0, sizeof(mask), &mask)) ||
+          (CPU_ISSET(proc, &mask) == 0)) {
+        VLOG(3) << "WARNING: Failed to set thread affinity for thread "
+                << thread_id;
+      }
+    }
+  } else {
+    VLOG(1) << "WARNING: Failed to set thread affinity for thread "
+            << thread_id;
+  }
+#endif
+}
 
  private:
   bool need_to_push_dense_;
