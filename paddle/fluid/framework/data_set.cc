@@ -184,7 +184,7 @@ void DatasetImpl<T>::GlobalShuffle() {
   // if it is not InMemory, memory_data_ is empty
  // std::random_shuffle(memory_data_.begin(), memory_data_.end());
   auto fleet_ptr = FleetWrapper::GetInstance();
-  std::shuffle(memory_data_.begin(), memory_data_.end(), fleet_ptr->LocalRandomEngine());
+  //std::shuffle(memory_data_.begin(), memory_data_.end(), fleet_ptr->LocalRandomEngine());
   VLOG(3) << "start global shuffle threads";
   std::vector<std::thread> global_shuffle_threads;
   for (int i = 0; i < thread_num_; ++i) {
