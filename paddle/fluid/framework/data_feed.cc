@@ -390,13 +390,15 @@ void InMemoryDataFeed<T>::GlobalShuffle() {
     }
 
     std::shuffle(begin, end, fleet_ptr->LocalRandomEngine());
+
     for (int64_t j = 0; j < fleet_send_batch_size_ && i + j < interval.second; ++j) { 
       int64_t random_num = fleet_ptr->LocalRandomEngine()();
       int64_t node_id = random_num % trainer_num_;
       send_vec[node_id].push_back(&((*memory_data_)[i + j]));
     }
     total_status.clear();
-    std::random_shuffle(send_index.begin(), send_index.end());
+    //std::random_shuffle(send_index.begin(), send_index.end());
+    std::shuffle(send_index.begin(), send_index.end(), fleet_ptr->LocalRandomEngine());
     for (int index = 0; index < send_index.size(); ++index) {
       int j = send_index[index];
       if (send_vec[j].size() == 0) {

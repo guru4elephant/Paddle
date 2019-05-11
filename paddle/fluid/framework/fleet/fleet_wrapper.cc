@@ -335,11 +335,11 @@ void FleetWrapper::PushSparseVarsWithLabelAsync(
         g_mat.col(i) *= /*32*/cur_batch;
         //VLOG(0) << "mul32 col " << i << " " << g_mat.col(i);
     }
-    std::stringstream ss1;
-    for (int i = 0; i < g_tensor->numel(); ++i) {
-        if (i % 11 == 0) ss1 << "\n";
-        ss1 << g[i] << ",";
-    }
+//    std::stringstream ss1;
+//    for (int i = 0; i < g_tensor->numel(); ++i) {
+//        if (i % 11 == 0) ss1 << "\n";
+//        ss1 << g[i] << ",";
+//    }
     //VLOG(0) << "after " << ss1.str();
 
     for (auto id_idx = 0u; id_idx < len; ++id_idx) {
