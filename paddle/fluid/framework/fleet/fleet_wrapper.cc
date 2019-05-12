@@ -400,12 +400,30 @@ std::future<int32_t> FleetWrapper::SendClientToClientMsg(
   return std::future<int32_t>();
 }
 
+// todo, move binary archive into paddle repo
 template <typename T>
-void FleetWrapper::Serialize(const std::vector<T*>& t, std::string* str) {
+void FleetWrapper::Serialize(const std::vector<T>& t,
+                             const size_t begin,
+                             const size_t end,
+                             std::string* str) {
+#ifdef PADDLE_WITH_PSLIB
+  paddle::ps::BinaryArchive ar;
+  for (size_t i = begin; i < end; ++i) {
+    ar << t[i];
+  }
+  *str = std::string(ar.buffer(), ar.length());
+  return;
+#else
+  VLOG(0) << "FleetWrapper::Serialize does nothing when no pslib";
+#endif
+}
+
+template <typename T>
+void FleetWrapper::Serialize(const std::vector<T>& t, std::string* str) {
 #ifdef PADDLE_WITH_PSLIB
   paddle::ps::BinaryArchive ar;
   for (size_t i = 0; i < t.size(); ++i) {
-    ar << *(t[i]);
+    ar << t[i];
   }
   *str = std::string(ar.buffer(), ar.length());
 #else
@@ -435,7 +453,12 @@ void FleetWrapper::Deserialize(std::vector<T>* t, const std::string& str) {
 }
 
 template void FleetWrapper::Serialize<std::vector<MultiSlotType>>(
-    const std::vector<std::vector<MultiSlotType>*>&, std::string*);
+    const std::vector<std::vector<MultiSlotType>>&, std::string*);
+
+template void FleetWrapper::Serialize<std::vector<MultiSlotType>>(
+    const std::vector<std::vector<MultiSlotType>>&,
+    const size_t, const size_t, std::string*);
+
 template void FleetWrapper::Deserialize<std::vector<MultiSlotType>>(
     std::vector<std::vector<MultiSlotType>>*, const std::string&);
 

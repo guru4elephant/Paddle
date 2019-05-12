@@ -89,11 +89,25 @@ void DataFeed::CheckStart() {
 }
 
 template <typename T>
+void PrivateQueueDataFeed<T>::SetInputQueue(
+    std::shared_ptr<paddle::operators::reader::BlockingQueue<T>> queue) {
+  input_queue_ = queue;
+}
+
+template <typename T>
+void PrivateQueueDataFeed<T>::SetOutputQueue(
+    std::shared_ptr<paddle::operators::reader::BlockingQueue<T>> queue) {
+  output_queue_ = queue;
+}
+
+template <typename T>
 void PrivateQueueDataFeed<T>::SetQueueSize(int queue_size) {
   PADDLE_ENFORCE(queue_size > 0, "Illegal queue size: %d.", queue_size);
   queue_size_ = queue_size;
+  /*
   queue_ = std::unique_ptr<paddle::operators::reader::BlockingQueue<T>>(
       new paddle::operators::reader::BlockingQueue<T>(queue_size_));
+  */
 }
 
 template <typename T>
@@ -116,10 +130,10 @@ void PrivateQueueDataFeed<T>::ReadThread() {
     __fsetlocking(&*fp_, FSETLOCKING_BYCALLER);
     T instance;
     while (ParseOneInstanceFromPipe(&instance)) {
-      queue_->Send(instance);
+      input_queue_->Send(instance);
     }
   }
-  queue_->Close();
+  input_queue_->Close();
 #endif
 }
 
@@ -131,7 +145,7 @@ int PrivateQueueDataFeed<T>::Next() {
   T instance;
   T ins_vec;
   while (index < default_batch_size_) {
-    if (!queue_->Receive(&instance)) {
+    if (!output_queue_->Receive(&instance)) {
       break;
     }
     AddInstanceToInsVec(&ins_vec, instance, index++);
@@ -252,7 +266,7 @@ template <typename T>
 void InMemoryDataFeed<T>::PutInsToChannel(const std::string& ins_str) {
 #ifdef _LINUX
   std::vector<T> ins;
-  DeserializeIns(&ins, ins_str);
+  // DeserializeIns(&ins, ins_str);
   shuffled_ins_->Extend(std::move(ins));
   VLOG(3) << "PutInsToChannel put ins num=" << ins.size()
           << " to channel, channel size=" << shuffled_ins_->Size()
@@ -380,7 +394,8 @@ void InMemoryDataFeed<T>::GlobalShuffle() {
   VLOG(3) << "global shuffle data from  [" << interval.first << ", "
           << interval.second << "), thread_id=" << thread_id_;
 
-  for (int64_t i = interval.first; i < interval.second; i += fleet_send_batch_size_) {
+  for (int64_t i = interval.first; i < interval.second;
+       i += fleet_send_batch_size_) {
     auto begin = memory_data_->begin() + i;
     auto end = memory_data_->begin() + i;
     if (i + fleet_send_batch_size_ >= interval.second) {
@@ -405,7 +420,7 @@ void InMemoryDataFeed<T>::GlobalShuffle() {
         continue;
       }
       std::string send_str;
-      SerializeIns(send_vec[j], &send_str);
+      // SerializeIns(send_vec[j], &send_str);
       auto ret = fleet_ptr->SendClientToClientMsg(0, j, send_str);
       total_status.push_back(std::move(ret));
       send_vec[j].clear();
@@ -529,11 +544,11 @@ void MultiSlotDataFeed::ReadThread() {
     int ins_num = 0;
     while (ParseOneInstanceFromPipe(&instance)) {
       ins_num++;
-      queue_->Send(instance);
+      input_queue_->Send(instance);
     }
     VLOG(3) << "filename: " << filename << " inst num: " << ins_num;
   }
-  queue_->Close();
+  input_queue_->Close();
 #endif
 }
 
@@ -993,19 +1008,6 @@ void MultiSlotInMemoryDataFeed::PutToFeedVec(
     }
   }
 #endif
-}
-
-// todo serialize ins in global shuffle
-void MultiSlotInMemoryDataFeed::SerializeIns(
-    const std::vector<std::vector<MultiSlotType>*>& ins, std::string* str) {
-  auto fleet_ptr = FleetWrapper::GetInstance();
-  fleet_ptr->Serialize(ins, str);
-}
-// todo deserialize ins in global shuffle
-void MultiSlotInMemoryDataFeed::DeserializeIns(
-    std::vector<std::vector<MultiSlotType>>* ins, const std::string& str) {
-  auto fleet_ptr = FleetWrapper::GetInstance();
-  fleet_ptr->Deserialize(ins, str);
 }
 
 }  // namespace framework

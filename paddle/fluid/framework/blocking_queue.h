@@ -14,10 +14,12 @@ limitations under the License. */
 
 #pragma once
 
+#include <algorithm>
 #include <condition_variable>  // NOLINT
 #include <deque>
 #include <mutex>  // NOLINT
 #include <utility>
+#include <vector>
 
 namespace paddle {
 namespace framework {
@@ -100,10 +102,41 @@ class BlockingQueue {
     std::deque<T>().swap(q_);
   }
 
+  void SetBlockSize(size_t x) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    block_size_ = x;
+  }
+
+  size_t Read(size_t n, T* vec) {
+    if (n == 0) {
+      return 0;
+    }
+    std::unique_lock<std::mutex> lock(mutex_);
+    cv_.wait(lock, [=] { return !q_.empty(); });
+    size_t read_num = 0;
+    while (read_num < n) {
+      size_t m = std::min(n - read_num, q_.size());
+      for (size_t i = 0; i < m; i++) {
+        vec[read_num++] = std::move(q_.front());
+        q_.pop_front();
+      }
+    }
+    cv_.notify_one();
+    return read_num;
+  }
+
+  size_t ReadIntoVec(const std::vector<T> * vec) {
+    vec->resize(block_size_);
+    size_t read_num = Read(vec->size(), &vec[0]);
+    vec.resize(read_num);
+    return read_num;
+  }
+
  private:
   std::mutex mutex_;
   std::condition_variable cv_;
   std::deque<T> q_;
+  size_t block_size_ = 80000;
 };
 
 }  // namespace framework

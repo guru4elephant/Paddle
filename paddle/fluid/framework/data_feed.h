@@ -52,6 +52,9 @@ namespace framework {
 //   while (reader->Next()) {
 //      // trainer do something
 //   }
+
+class MultiSlotType;
+
 class DataFeed {
  public:
   DataFeed() {
@@ -117,10 +120,24 @@ class DataFeed {
   virtual void PutInsToChannel(const std::string& ins_str) {}
 
   virtual int64_t GetChannelDataSize() {
-    return 0;  
+    return 0;
   }
 
   virtual void ReleaseChannelData() { }
+
+  virtual void SetInputQueue(
+      const std::shared_ptr<
+      paddle::operators::reader::BlockingQueue<
+      std::vector<MultiSlotType>>>& queue) {
+    input_queue_ = queue;
+  }
+
+  virtual void SetOutputQueue(
+      const std::shared_ptr<
+      paddle::operators::reader::BlockingQueue<
+      std::vector<MultiSlotType>>>& queue) {
+    output_queue_ = queue;
+  }
 
  protected:
   // The following three functions are used to check if it is executed in this
@@ -163,6 +180,12 @@ class DataFeed {
   bool finish_set_filelist_;
   bool finish_start_;
   std::string pipe_command_;
+  std::shared_ptr<
+      paddle::operators::reader::BlockingQueue<
+      std::vector<MultiSlotType>>> input_queue_;
+  std::shared_ptr<
+      paddle::operators::reader::BlockingQueue<
+      std::vector<MultiSlotType>>> output_queue_;
 };
 
 // PrivateQueueDataFeed is the base virtual class for ohther DataFeeds.
@@ -180,6 +203,10 @@ class PrivateQueueDataFeed : public DataFeed {
  protected:
   // The thread implementation function for reading file and parse.
   virtual void ReadThread();
+  virtual void SetInputQueue(
+      std::shared_ptr<paddle::operators::reader::BlockingQueue<T>> queue);
+  virtual void SetOutputQueue(
+      std::shared_ptr<paddle::operators::reader::BlockingQueue<T>> queue);
   // This function is used to set private-queue size, and the most
   // efficient when the queue size is close to the batch size.
   virtual void SetQueueSize(int queue_size);
@@ -187,8 +214,9 @@ class PrivateQueueDataFeed : public DataFeed {
   virtual bool ParseOneInstance(T* instance) = 0;
   virtual bool ParseOneInstanceFromPipe(T* instance) = 0;
   // This function is used to put instance to vec_ins
-  virtual void AddInstanceToInsVec(T* vec_ins, const T& instance,
-                                   int index) = 0;
+  virtual void AddInstanceToInsVec(
+      T* vec_ins, const T& instance,
+      int index) = 0;
   // This function is used to put ins_vec to feed_vec
   virtual void PutToFeedVec(const T& ins_vec) = 0;
 
@@ -203,8 +231,6 @@ class PrivateQueueDataFeed : public DataFeed {
   std::shared_ptr<FILE> fp_;
   size_t queue_size_;
   string::LineFileReader reader_;
-  // The queue for store parsed data
-  std::unique_ptr<paddle::operators::reader::BlockingQueue<T>> queue_;
 };
 
 template <typename T>
@@ -241,8 +267,6 @@ class InMemoryDataFeed : public PrivateQueueDataFeed<T> {
   virtual bool ParseOneInstance(T* instance) = 0;
   virtual bool ParseOneInstanceFromPipe(T* instance) = 0;
   virtual void PutToFeedVec(const T& ins_vec) = 0;
-  virtual void SerializeIns(const std::vector<T*>& ins, std::string* str) = 0;
-  virtual void DeserializeIns(std::vector<T>* ins, const std::string& str) = 0;
   virtual std::pair<int64_t, int64_t> GetMemoryDataInterval();
 
   int thread_id_;
@@ -359,10 +383,10 @@ class MultiSlotDataFeed
   virtual ~MultiSlotDataFeed() {}
   virtual void Init(const paddle::framework::DataFeedDesc& data_feed_desc);
   virtual bool CheckFile(const char* filename);
-  // virtual void ReadThread();
+  virtual void ReadThread();
 
  protected:
-  virtual void ReadThread();
+  // virtual void ReadThread();
   virtual void AddInstanceToInsVec(std::vector<MultiSlotType>* vec_ins,
                                    const std::vector<MultiSlotType>& instance,
                                    int index);
@@ -385,10 +409,6 @@ class MultiSlotInMemoryDataFeed
   virtual bool ParseOneInstance(std::vector<MultiSlotType>* instance);
   virtual bool ParseOneInstanceFromPipe(std::vector<MultiSlotType>* instance);
   virtual void PutToFeedVec(const std::vector<MultiSlotType>& ins_vec);
-  virtual void SerializeIns(const std::vector<std::vector<MultiSlotType>*>& ins,
-                            std::string* str);
-  virtual void DeserializeIns(std::vector<std::vector<MultiSlotType>>* ins,
-                              const std::string& str);
 
   virtual int64_t GetChannelDataSize() {
       if (cur_channel_ == 0) {

@@ -76,6 +76,31 @@ void DatasetImpl<T>::SetFleetSendBatchSize(int64_t size) {
 }
 
 template <typename T>
+void DatasetImpl<T>::SerializeIns(
+    const std::vector<T>& ins,
+    size_t begin,
+    size_t end,
+    std::string* str) {
+  auto fleet_ptr = FleetWrapper::GetInstance();
+  fleet_ptr->Serialize(ins, begin, end, str);
+}
+
+// todo serialize ins in global shuffle
+template <typename T>
+void DatasetImpl<T>::SerializeIns(
+    const std::vector<T>& ins, std::string* str) {
+  auto fleet_ptr = FleetWrapper::GetInstance();
+  fleet_ptr->Serialize(ins, str);
+}
+
+template <typename T>
+void DatasetImpl<T>::DeserializeIns(
+    std::vector<T>* ins, const std::string& str) {
+  auto fleet_ptr = FleetWrapper::GetInstance();
+  fleet_ptr->Deserialize(ins, str);
+}
+
+template <typename T>
 void DatasetImpl<T>::SetHdfsConfig(const std::string& fs_name,
                                    const std::string& fs_ugi) {
   fs_name_ = fs_name;
@@ -122,6 +147,7 @@ void DatasetImpl<T>::LoadIntoMemory() {
   if (readers_.size() == 0) {
     CreateReaders();
   }
+
   std::vector<std::thread> load_threads;
   for (int64_t i = 0; i < thread_num_; ++i) {
     load_threads.push_back(std::thread(
@@ -274,10 +300,11 @@ int DatasetImpl<T>::ReceiveFromClient(int msg_type, int client_id,
   VLOG(3) << "ReceiveFromClient msg_type=" << msg_type
           << ", client_id=" << client_id << ", msg length=" << msg.length();
   auto fleet_ptr = FleetWrapper::GetInstance();
-  int64_t index = fleet_ptr->LocalRandomEngine()() % thread_num_;  
-  //rand_r(&rand_seed) % thread_num_;
+  int64_t index = fleet_ptr->LocalRandomEngine()() % thread_num_;
+  //  rand_r(&rand_seed) % thread_num_;
   VLOG(3) << "ramdom index=" << index;
   readers_[index]->PutInsToChannel(msg);
+  //  queues_[index]
 #endif
   return 0;
 }

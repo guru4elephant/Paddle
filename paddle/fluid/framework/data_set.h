@@ -67,10 +67,6 @@ class Dataset {
   virtual std::pair<std::string, std::string> GetHdfsConfig() = 0;
   // get data fedd desc
   virtual const paddle::framework::DataFeedDesc& GetDataFeedDesc() = 0;
-  // get readers, the reader num depend both on thread num
-  // and filelist size
-  virtual std::vector<std::shared_ptr<paddle::framework::DataFeed>>&
-  GetReaders() = 0;
   // register message handler between workers
   virtual void RegisterClientToClientMsgHandler() = 0;
   // load all data into memory
@@ -85,6 +81,8 @@ class Dataset {
   virtual void CreateReaders() = 0;
   // destroy readers
   virtual void DestroyReaders() = 0;
+  virtual std::vector<std::shared_ptr<
+      paddle::framework::DataFeed>>& GetReaders() = 0;
   
   virtual int64_t GetMemoryDataSize()  = 0;
   virtual int64_t GetChannelDataSize() = 0;
@@ -94,6 +92,7 @@ class Dataset {
                                 const std::string& msg) = 0;
 };
 
+
 // DatasetImpl is the implementation of Dataset,
 // it holds memory data if user calls load_into_memory
 template <typename T>
@@ -102,6 +101,15 @@ class DatasetImpl : public Dataset {
   DatasetImpl();
   virtual ~DatasetImpl() {}
 
+  virtual void SerializeIns(
+      const std::vector<T>& ins, std::string* str);
+  virtual void SerializeIns(
+      const std::vector<T>& ins,
+      size_t begin,
+      size_t end,
+      std::string* str);
+  virtual void DeserializeIns(
+      std::vector<T>* ins, const std::string& str);
   virtual void SetFileList(const std::vector<std::string>& filelist);
   virtual void SetThreadNum(int thread_num);
   virtual void SetTrainerNum(int trainer_num);
@@ -120,7 +128,8 @@ class DatasetImpl : public Dataset {
   virtual const paddle::framework::DataFeedDesc& GetDataFeedDesc() {
     return data_feed_desc_;
   }
-  virtual std::vector<std::shared_ptr<paddle::framework::DataFeed>>&
+  virtual std::vector<
+      std::shared_ptr<paddle::framework::DataFeed>>&
   GetReaders();
 
   virtual void RegisterClientToClientMsgHandler();
@@ -136,7 +145,7 @@ class DatasetImpl : public Dataset {
   }
 
   virtual int64_t GetChannelDataSize() {
-    uint64_t sum = 0 ;
+    uint64_t sum = 0;
     for (int i = 0; i < readers_.size(); ++i) {
         sum += readers_[i]->GetChannelDataSize();
     }
@@ -146,7 +155,8 @@ class DatasetImpl : public Dataset {
  protected:
   virtual int ReceiveFromClient(int msg_type, int client_id,
                                 const std::string& msg);
-  std::vector<std::shared_ptr<paddle::framework::DataFeed>> readers_;
+  std::vector<std::shared_ptr<
+      paddle::framework::DataFeed>> readers_;
   std::vector<T> memory_data_;
   std::mutex mutex_for_update_memory_data_;
   int thread_num_;
@@ -159,10 +169,32 @@ class DatasetImpl : public Dataset {
   std::string fs_ugi_;
   unsigned int rand_seed;
   int64_t fleet_send_batch_size_;
+  
 };
 
-// use std::vector<MultiSlotType> as data type
-class MultiSlotDataset : public DatasetImpl<std::vector<MultiSlotType>> {
+class SingleQueueDatasetImpl : public
+    DatasetImpl<std::vector<MultiSlotType>> {
+ public:
+  SingleQueueDatasetImpl();
+  virtual ~SingleQueueDatasetImpl() {}
+
+  virtual void CreateReaders();
+  virtual void LocalShuffle();
+  virtual void GlobalShuffle();
+  virtual void LoadIntoMemory();
+  virtual void ReleaseMemory();
+
+ protected:
+  std::shared_ptr<
+      paddle::operators::reader::BlockingQueue<
+      std::vector<MultiSlotType>>> read_queue_;
+  std::shared_ptr<
+      paddle::operators::reader::BlockingQueue<
+      std::vector<MultiSlotType>>> write_queue_;
+};
+
+
+class MultiSlotDataset : public SingleQueueDatasetImpl {
  public:
   MultiSlotDataset() {}
   virtual ~MultiSlotDataset() {}

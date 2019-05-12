@@ -207,7 +207,14 @@ auto push_status = pslib_ptr_->_worker_ptr->push_dense_param(regions.data(), reg
                                              const std::string& msg);
 
   template <typename T>
-  void Serialize(const std::vector<T*>& t, std::string* str);
+  void Serialize(const std::vector<T>& t,
+                 const size_t begin,
+                 const size_t end,
+                 std::string* str);
+
+  template <typename T>
+  void Serialize(const std::vector<T>& t, std::string* str);
+
   template <typename T>
   void Deserialize(std::vector<T>* t, const std::string& str);
   static std::shared_ptr<FleetWrapper> GetInstance() {

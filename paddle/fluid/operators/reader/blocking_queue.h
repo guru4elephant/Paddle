@@ -14,9 +14,11 @@
 
 #pragma once
 
+#include <algorithm>
 #include <condition_variable>  // NOLINT
 #include <deque>
 #include <utility>
+#include <vector>
 
 #include "paddle/fluid/platform/enforce.h"
 
@@ -118,11 +120,42 @@ class BlockingQueue {
     return queue_.size();
   }
 
+  void SetBlockSize(size_t x) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    block_size_ = x;
+  }
+
+  size_t Read(size_t n, std::vector<T> * vec) {
+    if (n == 0) {
+      return 0;
+    }
+    std::unique_lock<std::mutex> lock(mutex_);
+    receive_cv_.wait(lock, [=] { return !queue_.empty(); });
+    size_t read_num = 0;
+    while (read_num < n) {
+      size_t m = std::min(n - read_num, queue_.size());
+      for (size_t i = 0; i < m; i++) {
+        (*vec)[read_num++] = std::move(queue_.front());
+        queue_.pop_front();
+      }
+    }
+    send_cv_.notify_one();
+    return read_num;
+  }
+
+  size_t ReadIntoVec(std::vector<T> * vec) {
+    // (*vec).resize(block_size_);
+    size_t read_num = Read(vec->size(), vec);
+    // (*vec).resize(read_num);
+    return read_num;
+  }
+
  private:
   size_t capacity_;
   bool speed_test_mode_;
   bool closed_;
   std::deque<T> queue_;
+  size_t block_size_ = 80000;
 
   mutable std::mutex mutex_;
   mutable std::condition_variable receive_cv_;
