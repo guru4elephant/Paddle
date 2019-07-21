@@ -15,10 +15,12 @@
 #include <time.h>
 #include <fstream>
 
+#include "paddle/fluid/framework/dataset_factory.h"
 #include "paddle/fluid/framework/executor.h"
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/framework/program_desc.h"
 #include "paddle/fluid/framework/tensor_util.h"
+#include "paddle/fluid/framework/variable_helper.h"
 #include "paddle/fluid/platform/device_context.h"
 #include "paddle/fluid/platform/init.h"
 #include "paddle/fluid/platform/place.h"
@@ -38,8 +40,8 @@ void ReadBinaryFile(const std::string& filename, std::string* contents) {
   fin.close();
 }
 
-std::unique_ptr<paddle::framework::ProgramDesc> Load(
-    paddle::framework::Executor* executor, const std::string& model_filename) {
+std::unique_ptr<paddle::framework::ProgramDesc> LoadProgramDesc(
+    const std::string& model_filename) {
   VLOG(3) << "loading model from " << model_filename;
   std::string program_desc_str;
   ReadBinaryFile(model_filename, &program_desc_str);
@@ -49,15 +51,11 @@ std::unique_ptr<paddle::framework::ProgramDesc> Load(
   return main_program;
 }
 
-void Save(const std::unique_ptr<ProgramDesc>& program, Scope* scope,
-          const std::vector<std::string>& param_names,
-          const std::string& model_name, bool save_combine) {}
-
 }  // namespace train
 }  // namespace paddle
 
 int main(int argc, char* argv[]) {
-  // filelist, startup_prog, main_prog, model
+  // filelist, data_feed.prototxt startup_prog, main_prog, model
   std::string filelist = std::string(argv[1]);
   std::vector<std::string> file_vec;
   std::ifstream fin(filelist);
@@ -68,23 +66,48 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  paddle.framework::DataFeedDesc data_feed_desc;
-  data_feed_desc.set_name();
-  data_feed_desc.set_batch_size();
-  data_feed_desc.set_multi_slot_desc();
-  data_feed_desc.set_pipe_command();
-  data_feed_desc.set_thread_num();
+  std::string data_feed_desc_str;
+  paddle::train::ReadBinaryFile(std::string(argv[2]), &data_feed_desc_str);
 
-  std::shared_ptr<paddle::framework::Dataset> dataset_ptr;
-  dataset_ptr.reset(new paddle::framework::Dataset());
+  std::unique_ptr<paddle::framework::Dataset> dataset_ptr;
+  // dataset_ptr =
+  // paddle::framework::DatasetFactory::CreateDataset("MultiSlotDataset");
   dataset_ptr->SetFileList(file_vec);
-  dataset_ptr->SetDataFeedDesc();
+  dataset_ptr->SetThreadNum(1);
+  dataset_ptr->SetDataFeedDesc(data_feed_desc_str);
   const std::vector<paddle::framework::DataFeed*> readers =
       dataset_ptr->GetReaders();
 
   // load program here
+  const auto cpu_place = paddle::platform::CPUPlace();
+  paddle::framework::Executor executor(cpu_place);
+  paddle::framework::Scope scope;
+  auto startup_program = paddle::train::LoadProgramDesc(std::string(argv[3]));
+  auto main_program = paddle::train::LoadProgramDesc(std::string(argv[4]));
 
-  // create ops here
+  // run startup program
+  auto& block = main_program->Block(0);
+  executor.Run(*startup_program, &scope, 0);
+
+  paddle::framework::Scope* child_scope = &scope.NewScope();
+  for (auto& var : block.AllVars()) {
+    if (var->Persistable()) {
+      auto* ptr = child_scope->Var(var->Name());
+      InitializeVariable(ptr, var->GetType());
+    } else {
+      auto* ptr = child_scope->Var(var->Name());
+      InitializeVariable(ptr, var->GetType());
+    }
+  }
+
+  std::vector<paddle::framework::OperatorBase*> ops;
+  for (auto& op_desc : block.AllOps()) {
+    std::unique_ptr<paddle::framework::OperatorBase> local_op =
+        paddle::framework::OpRegistry::CreateOp(*op_desc);
+    paddle::framework::OperatorBase* local_op_ptr = local_op.release();
+    ops.push_back(local_op_ptr);
+    continue;
+  }
 
   int epoch_num = 10;
 
@@ -92,11 +115,10 @@ int main(int argc, char* argv[]) {
     readers[0]->Start();
     int cur_batch = 0;
     while ((cur_batch = readers[0]->Next()) > 0) {
-      for (auto& op : ops_) {
-        op->Run(scope, place);
+      for (auto& op : ops) {
+        op->Run(*child_scope, cpu_place);
       }
-      local_scope->DropKids();
+      child_scope->DropKids();
     }
-    paddle::framework::Save();
   }
 }

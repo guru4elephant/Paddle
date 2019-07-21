@@ -32,6 +32,7 @@ link_directories("${PADDLE_LIB}/third_party/install/xxhash/lib")
 link_directories("${PADDLE_LIB}/third_party/install/zlib/lib")
 
 add_executable(demo_trainer demo_trainer.cc)
+add_executable(demo_text_classification demo_text_classification.cc)
 
 if(WITH_MKLDNN)
   include_directories("${PADDLE_LIB}/third_party/install/mkldnn/include")
@@ -76,3 +77,13 @@ target_link_libraries(demo_trainer
         ${MKLDNN_LIB}
         glog gflags protobuf snappystream snappy z xxhash
         ${EXTERNAL_LIB})
+
+target_link_libraries(demo_text_classification
+	${MACOS_LD_FLAGS}
+	${ARCHIVE_START}
+	${PADDLE_LIB}/paddle/fluid/inference/libpaddle_fluid.so
+	${ARCHIVE_END}
+	${MATH_LIB}
+	${MKLDNN_LIB}
+	glog gflags protobuf snappystream snappy z xxhash
+	${EXTERNAL_LIB})
