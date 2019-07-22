@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
   paddle::train::ReadBinaryFile(std::string(argv[2]), &data_feed_desc_str);
 
   std::unique_ptr<paddle::framework::Dataset> dataset_ptr;
-  // dataset_ptr =
-  // paddle::framework::DatasetFactory::CreateDataset("MultiSlotDataset");
+  dataset_ptr =
+      paddle::framework::DatasetFactory::CreateDataset("MultiSlotDataset");
   dataset_ptr->SetFileList(file_vec);
   dataset_ptr->SetThreadNum(1);
   dataset_ptr->SetDataFeedDesc(data_feed_desc_str);
