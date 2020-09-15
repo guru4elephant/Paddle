@@ -55,6 +55,9 @@ class TestFleetAMPOptimizer(unittest.TestCase):
         optimizer = fleet.distributed_optimizer(optimizer, strategy=strategy)
         optimizer.minimize(avg_cost)
 
+        strategy = fleet._final_strategy()
+        print(strategy)
+
         ops = [op.type for op in avg_cost.block.ops]
         self.assertIn('cast', ops)
         self.assertIn('isfinite', ops)
