@@ -19,8 +19,8 @@ API_FILES=("CMakeLists.txt"
            "paddle/fluid/framework/ir/node.h"
            "paddle/fluid/framework/ir/graph.h"
            "paddle/fluid/framework/framework.proto"
-	    "python/paddle/distributed/__init"
-	    "python/paddle/distributed/fleet/__init__.py"
+	   "python/paddle/distributed/__init__.py"
+	   "python/paddle/distributed/fleet/__init__.py"
            "python/requirements.txt"
            "python/paddle/fluid/__init__.py"
            "python/paddle/fluid/compiler.py"
@@ -85,8 +85,8 @@ for API_FILE in ${API_FILES[*]}; do
           echo_line="You must have one RD (kolinwei (Recommend) or luotao1) approval for python/requirements.txt, which manages the third-party python package.\n"
           check_approval 1 22165420 6836917
       elif [ "${API_FILE}" == "paddle/fluid/operators/distributed/send_recv.proto.in" ];then
-          echo_line="You must have one RD (gongweibao or seiriosPlus) approval for the paddle/fluid/operators/distributed/send_recv.proto.in, which manages the environment variables.\n"
-          check_approval 1 10721757 5442383
+          echo_line="You must have one RD (gongweibao or seiriosPlus or guru4elephant) approval for the paddle/fluid/operators/distributed/send_recv.proto.in, which manages the environment variables.\n"
+          check_approval 1 10721757 5442383 35550832
       elif [ "${API_FILE}" == "paddle/fluid/framework/unused_var_check.cc" ];then
           echo_line="You must have one RD (zhiqiu (Recommend) or luotao1) approval for the changes of paddle/fluid/framework/unused_var_check.cc, which manages the allow list of operators that have unused input variables. Before change the allow list, please read the specification [https://github.com/PaddlePaddle/Paddle/wiki/OP-Should-Not-Have-Unused-Input] and try to refine code first. \n"
           check_approval 1 6888866 6836917
